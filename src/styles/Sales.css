@@ -1,0 +1,377 @@
+.sales-container {
+  padding: 30px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.sales-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+}
+
+.sales-header h1 {
+  font-size: 2rem;
+  color: var(--text-primary);
+}
+
+.sales-filters {
+  margin-bottom: 24px;
+}
+
+.filter-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr auto auto;
+  gap: 12px;
+  
+  align-items: center;
+}
+.filter-rows{
+   display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr auto auto;
+  gap: 12px;
+  margin-top: 15px;
+  align-items: center;
+}
+.sales-filters input,
+.sales-filters select {
+  padding: 10px 16px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+}
+
+.sales-filters input:focus,
+.sales-filters select:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.btn-filter {
+  padding: 10px 24px;
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: background-color 0.2s;
+  white-space: nowrap;
+}
+
+.btn-filter:hover {
+  background-color: #e55a2b;
+}
+
+.btn-clear {
+  padding: 10px 24px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.btn-clear:hover {
+  background-color: var(--bg-primary);
+}
+
+.sales-table-container {
+  background-color: var(--bg-secondary);
+  border-radius: 12px;
+  overflow-x: auto;
+  overflow-y: visible;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
+  z-index: 1;
+  max-width: 100%;
+}
+
+.sales-table {
+  width: 100%;
+  /* min-width: 2800px; */
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.sales-table thead {
+  background-color: var(--bg-tertiary);
+}
+
+.sales-table th {
+  padding: 12px 8px;
+  text-align: center;
+  font-weight: 600;
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--border-color);
+  background-color: var(--bg-tertiary);
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sales-table td {
+  padding: 10px 8px;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-primary);
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+/* Column width definitions - Optimized for better readability */
+.sales-table th:nth-child(1) { width: 70px; } /* Select */
+.sales-table th:nth-child(2) { width: 50px; } /* လ */
+.sales-table th:nth-child(3) { width: 100px; } /* ဆိုင်ခွဲ */
+.sales-table th:nth-child(4) { width: 90px; } /* ရက်စွဲ */
+.sales-table th:nth-child(5) { width: 150px; } /* ကုတ်အမှတ် */
+.sales-table th:nth-child(6) { width: 150px; } /* အမျိုးအစား */
+.sales-table th:nth-child(7) { width: 100px; } /* အရေအတွက် */
+.sales-table th:nth-child(8) { width: 100px; } /* စိန်ပွင့်ရေ */
+.sales-table th:nth-child(9) { width: 120px; } /* ကျောက်ပွင့်ရေ */
+.sales-table th:nth-child(10) { width: 150px; } /* စုစုပေါင်း အလေးချိန် */
+.sales-table th:nth-child(11) { width: 70px; } /* ရွှေချိန် */
+.sales-table th:nth-child(12) { width: 100px; } /* ကျောက်ချိန် */
+.sales-table th:nth-child(13) { width: 80px; } /* ပဲရည် */
+.sales-table th:nth-child(14) { width: 100px; } /* ရွှေဈေးနူန်း */
+.sales-table th:nth-child(15) { width: 100px; } /* အထည် ဂရမ် */
+.sales-table th:nth-child(16) { width: 50px; } /* ကျပ် */
+.sales-table th:nth-child(17) { width: 50px; } /* ပဲ */
+.sales-table th:nth-child(18) { width: 50px; } /* ရွေး */
+.sales-table th:nth-child(19) { width: 80px; } /* ရွှေ တန်ဖိုး */
+.sales-table th:nth-child(20) { width: 80px; } /* ကျပ်သား */
+.sales-table th:nth-child(21) { width: 150px; } /* Round Kyattar */
+.sales-table th:nth-child(22) { width: 120px; } /* အလျော့ ကျပ် */
+.sales-table th:nth-child(23) { width: 120px; } /* အလျော့ ပဲ */
+.sales-table th:nth-child(24) { width: 120px; } /* အလျော့ ရွေး */
+.sales-table th:nth-child(25) { width: 120px; } /* အလျော့ ဂရမ် */
+.sales-table th:nth-child(26) { width: 120px; } /* အလျော့ တန်ဖိုး */
+.sales-table th:nth-child(27) { width: 150px; } /* ရွှေတန်ဖိုး စုစုပေါင်း */
+.sales-table th:nth-child(28) { width: 150px; } /* စိန်/ကျောက် တန်ဖိုး */
+.sales-table th:nth-child(29) { width: 170px; } /* စုစုပေါင်း ပစ္စည်းတန်ဖိုး */
+.sales-table th:nth-child(30) { width: 180px; } /* Purchase Voucher */
+.sales-table th:nth-child(31) { width: 150px; } /* Different Amount */
+.sales-table th:nth-child(32) { width: 80px; } /* Stamp */
+.sales-table th:nth-child(33) { width: 120px; } /* Total Amount */
+.sales-table th:nth-child(34) { width: 100px; } /* ပြေစာအမှတ် */
+.sales-table th:nth-child(35) { width: 120px; } /* ဝယ်ယူသူအမည် */
+.sales-table th:nth-child(36) { width: 120px; } /* မှတ်ပုံတင်အမှတ် */
+.sales-table th:nth-child(37) { width: 90px; } /* ဖုန်းနံပါတ် */
+.sales-table th:nth-child(38) { width: 130px; } /* လိပ်စာ */
+.sales-table th:nth-child(39) { width: 70px; } /* Type */
+.sales-table th:nth-child(40) { width: 100px; } /* On/Off */
+.sales-table th:nth-child(41) { width: 100px; } /* Change */
+.sales-table th:nth-child(42) { width: 100px; } /* Return */
+.sales-table th:nth-child(43) { width: 100px; } /* GS Date */
+.sales-table th:nth-child(44) { width: 120px; } /* Dia and Gem */
+.sales-table th:nth-child(45) { width: 100px; } /* အခြေအနေ */
+.sales-table th:nth-child(46) { width: 150px; } /* Real to Payment */
+.sales-table th:nth-child(47) { width: 120px; } /* Sale Name */
+.sales-table th:nth-child(48) { width: 150px; } /* မှတ်ချက် */
+.sales-table th:nth-child(49) { width: 130px; } /* Sale Status */
+.sales-table th:nth-child(50) { width: 90px; } /* လုပ်ဆောင်ချက်များ */
+
+.sales-table tbody tr:hover {
+  background-color: rgba(59, 130, 246, 0.1);
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.status-badge {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.status-new {
+  background-color: #e3f2fd;
+  color: #1976d2;
+}
+
+.status-completed {
+  background-color: #e8f5e9;
+  color: #388e3c;
+}
+
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 1.25rem;
+  padding: 4px 8px;
+  margin: 0 4px;
+  transition: transform 0.2s;
+}
+
+.btn-icon:hover {
+  transform: scale(1.2);
+}
+
+.btn-primary {
+  padding: 12px 24px;
+  background-color: var(--accent-color);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover {
+  background-color: #e55a2b;
+  transform: translateY(-1px);
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background-color: var(--bg-primary);
+  border-radius: 16px;
+  width: 600px;
+  max-width: 90%;
+  max-height: 90vh;
+  overflow-y: auto;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.modal-header h2 {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  color: var(--text-secondary);
+  line-height: 1;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+}
+
+.modal-close:hover {
+  background-color: var(--bg-tertiary);
+}
+
+.modal-body {
+  padding: 24px;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+}
+
+.detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.detail-item label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.detail-item span {
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.modal-footer {
+  padding: 16px 24px;
+  border-top: 1px solid var(--border-color);
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.btn-secondary {
+  padding: 10px 24px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-secondary:hover {
+  background-color: var(--bg-primary);
+}
+
+.sale-form {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+.btn-secondary {
+  padding: 10px 20px;
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary);
+}
+
+.no-data {
+  text-align: center;
+  padding: 40px;
+  color: var(--text-secondary);
+}
