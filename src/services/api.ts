@@ -1,10 +1,11 @@
 import axios from 'axios';
 
-const API_BASE_URL = 'http://192.168.100.233:8000/api';
+const API_BASE_URL =  'http://192.168.100.171:8000/api';
+// const API_BASE_URL =  'https://kpi.29jewellery.com/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 30000,
+  timeout: 60000, // Increased to 60 seconds
   headers: {
     'Content-Type': 'application/json',
   },
@@ -63,9 +64,11 @@ export const saleAnalyticsAPI = {
   getSaleStatuses: () => api.get('/sale-analytics/helpers/sale-statuses'),
   getRecordById: (id: number) => api.get(`/sale-analytics/${id}`),
   createRecord: (data: any) => api.post('/sale-analytics', data),
+  updateRecord: (id: number, data: any) => api.put(`/sale-analytics/${id}`, data),
   getRecords: (filters?: { sale_status_id?: number; date_from?: string; date_to?: string; item_code?: string; invoice_number?: string }) => {
     return api.get('/sale-analytics', { params: filters });
   },
 };
 
+export { API_BASE_URL };
 export default api;

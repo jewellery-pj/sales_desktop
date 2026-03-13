@@ -11,6 +11,7 @@ const App: React.FC = () => {
   const { isAuthenticated, loading, logout, user } = useAuth();
   const { t } = useTranslation();
   const [currentPage, setCurrentPage] = React.useState<'sales-list' | 'sale-status' | 'profile'>('sales-list');
+  const [sidebarOpen, setSidebarOpen] = React.useState(true);
 
   if (loading) {
     return <div className="loading-screen">Loading...</div>;
@@ -21,8 +22,14 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="app-container">
-      <nav className="sidebar">
+    <div className={`app-container ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
+      <button 
+        className="sidebar-toggle-btn"
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+      >
+        {sidebarOpen ? '☰' : '☰'}
+      </button>
+      <nav className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
           <h1>29 Jewellery</h1>
           <p className="user-name">{user?.name}</p>
@@ -61,7 +68,7 @@ const App: React.FC = () => {
         </div>
       </nav>
 
-      <main className="main-content">
+      <main className={`main-content ${sidebarOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
         {currentPage === 'sales-list' && <Sales />}
         {currentPage === 'sale-status' && <SaleStatus />}
         {currentPage === 'profile' && <Profile />}

@@ -10,15 +10,18 @@ function createWindow() {
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
-      webSecurity: false,
+      webSecurity: false, // Allow external URL
       allowRunningInsecureContent: true,
       preload: path.join(__dirname, 'preload.js'),
     },
     title: '29 Jewellery - Sales Management',
+    icon: path.join(__dirname, '../public/icon.png'),
   });
 
   if (process.env.NODE_ENV === 'development') {
+    // mainWindow.loadURL('https://saleapp.29jewellery.com');
     mainWindow.loadURL('http://localhost:5173');
+
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));

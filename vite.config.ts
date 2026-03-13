@@ -6,8 +6,12 @@ export default defineConfig({
   base: './',
   build: {
     outDir: 'dist',
+    assetsDir: 'assets',
   },
   server: {
     port: 5173,
+  },
+  define: {
+    'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'development'),
   },
 })

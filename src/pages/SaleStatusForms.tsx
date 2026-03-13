@@ -1,7 +1,8 @@
 // This file contains the remaining form implementations for PT RC, G Sale, and PT Sale
 // These will be copied into SaleStatus.tsx to replace the placeholder forms
 
-import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../services/api';
+
 
 // PT RC Form Implementation
 export const PTRCFormImplementation = `
@@ -54,7 +55,7 @@ const PTRCForm: React.FC = () => {
   const fetchBranches = async () => {
     try {
       const token = localStorage.getItem('auth_token');
-      const response = await fetch('http://192.168.100.215:8000/api/sale-analytics/helpers/branches', {
+      const response = await fetch(${API_BASE_URL}/sale-analytics/helpers/branches, {
         headers: { 'Authorization': \`Bearer \${token}\` },
       });
       const data = await response.json();
@@ -78,7 +79,7 @@ const PTRCForm: React.FC = () => {
       const userData = localStorage.getItem('user_data');
       if (userData) {
         const user = JSON.parse(userData);
-        const response = await fetch(\`http://192.168.100.215:8000/api/sale-analytics/helpers/employees?branch_id=\${user.branch_id}\`, {
+        const response = await fetch(\`${API_BASE_URL}/sale-analytics/helpers/employees?branch_id=\${user.branch_id}\`, {
           headers: { 'Authorization': \`Bearer \${token}\` },
         });
         const data = await response.json();
@@ -176,7 +177,7 @@ const PTRCForm: React.FC = () => {
         different_amount: formData.different_amount || 0,
       };
 
-      const response = await fetch('http://192.168.100.215:8000/api/sale-analytics', {
+      const response = await fetch('${API_BASE_URL}/api/sale-analytics', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

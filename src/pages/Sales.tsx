@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import * as XLSX from 'xlsx';
 import { saleAnalyticsAPI } from '../services/api';
 import '../styles/Sales.css';
 
 interface Sale {
   id: number;
-  month?: number;
+  month: number;
+  branch_id: number;
   branch_name?: string;
   date: string;
   item_code?: string;
@@ -37,31 +37,35 @@ interface Sale {
   sale_voucher_amount?: number;
   different_amount?: number;
   stamp?: number;
-  total_amount: number;
+  total_amount?: number;
   invoice_number?: string;
   customer_name?: string;
   nrc_no?: string;
   phone_no?: string;
   address?: string;
   transcation_type?: string;
-  on_off?: string;
-  change?: number;
-  return?: number;
-  gs_date?: string;
-  dia_and_gem?: string;
-  status: string;
-  real_to_payment_amount?: number;
+  employee_id?: number;
+  employee_name?: string;
   remark?: string;
   sale_status_id?: number;
   sale_status_name?: string;
-  employee_name?: string;
+  real_to_payment_amount?: number;
+  prefix?: string;
+  on_off?: 'online' | 'offline';
+  change?: number;
+  return?: number;
+  gs_date?: string;
+  dia_and_gem?: 'diamond' | 'gem';
+  status?: 'new' | 'return';
+  charges_and_other?: number;
 }
 
 const Sales: React.FC = () => {
   const [sales, setSales] = useState<Sale[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [saleStatuses, setSaleStatuses] = useState<any[]>([]);
+  const [employees, setEmployees] = useState<any[]>([]);
+  const [branches, setBranches] = useState<any[]>([]);
   const [filters, setFilters] = useState({
     sale_status_id: '',
     date_from: '',
@@ -73,11 +77,12 @@ const Sales: React.FC = () => {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
-  const { t } = useTranslation();
-
+  
   useEffect(() => {
     fetchSales();
     fetchSaleStatuses();
+    fetchBranches();
+    fetchEmployees();
   }, []);
 
   const fetchSaleStatuses = async () => {
@@ -101,6 +106,37 @@ const Sales: React.FC = () => {
       }
     } catch (error) {
       console.log('Using hardcoded sale statuses due to API error');
+    }
+  };
+
+  const fetchBranches = async () => {
+    try {
+      const response = await saleAnalyticsAPI.getBranches();
+      const result = response.data;
+      if (result.success) {
+        setBranches(result.data || []);
+        console.log('Branches loaded:', result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching branches:', error);
+    }
+  };
+
+  const fetchEmployees = async () => {
+    try {
+      // Get branch_id from localStorage or use default branch 1
+      const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+      const branchId = userData.branch_id || 1;
+      console.log('Fetching employees for branch:', branchId);
+      
+      const response = await saleAnalyticsAPI.getEmployees(branchId);
+      const result = response.data;
+      if (result.success) {
+        setEmployees(result.data || []);
+        console.log('Employees loaded:', result.data);
+      }
+    } catch (error) {
+      console.error('Error fetching employees:', error);
     }
   };
 
@@ -131,20 +167,7 @@ const Sales: React.FC = () => {
     fetchSales();
   };
 
-  const handleShow = async (id: number) => {
-    try {
-      const response = await saleAnalyticsAPI.getRecordById(id);
-      const result = response.data;
-      if (result.success) {
-        setSelectedSale(result.data);
-        setIsEditMode(false);
-        setShowModal(true);
-      }
-    } catch (error) {
-      console.error('Error fetching sale details:', error);
-    }
-  };
-
+  
   const handleEdit = async (id: number) => {
     try {
       const response = await saleAnalyticsAPI.getRecordById(id);
@@ -156,6 +179,65 @@ const Sales: React.FC = () => {
       }
     } catch (error) {
       console.error('Error fetching sale details:', error);
+    }
+  };
+
+  const handleUpdate = async () => {
+    try {
+      if (!selectedSale?.id) {
+        console.error('No sale selected for update');
+        return;
+      }
+
+      // Validate required fields
+      const requiredFields = ['branch_id', 'date'];
+      const missingFields = requiredFields.filter(field => !(selectedSale as any)[field]);
+      
+      if (missingFields.length > 0) {
+        console.error('Missing required fields:', missingFields);
+        alert('Please fill in all required fields');
+        return;
+      }
+
+      // Clean the data - remove undefined/null values and non-table columns
+      const cleanData: any = {};
+      const tableColumns = [
+        'id', 'year', 'month', 'branch_id', 'date', 'item_code', 'item_categories',
+        'quantity', 'dia_qty', 'gem_qty', 'total_weight', 'gold_weight', 'gem_weight',
+        'density', 'gold_price', 'k', 'p', 'y', 'w_gram', 'gold_value', 'kyattar',
+        'round_kyattar', 'loss_k', 'loss_p', 'loss_y', 'loss_gram', 'loss_value',
+        'total_gold_value', 'dia_gem_value', 'charges_and_other', 'total_value',
+        'sale_voucher_amount', 'different_amount', 'stamp', 'total_amount',
+        'invoice_number', 'customer_name', 'nrc_no', 'phone_no', 'address',
+        'transcation_type', 'status', 'prefix', 'on_off', 'employee_id', 'gs_date',
+        'change', 'return', 'dia_and_gem', 'remark', 'real_to_payment_amount',
+        'column1', 'column2', 'sale_status_id', 'item_type_id', 'item_group_id',
+        'created_at', 'updated_at', 'cashier_id'
+      ];
+      
+      Object.keys(selectedSale).forEach(key => {
+        const value = (selectedSale as any)[key];
+        if (value !== undefined && value !== null && tableColumns.includes(key)) {
+          cleanData[key] = value;
+        }
+      });
+
+      console.log('Updating with data:', cleanData);
+
+      const response = await saleAnalyticsAPI.updateRecord(selectedSale.id, cleanData);
+      const result = response.data;
+      
+      if (result.success) {
+        console.log('Sale updated successfully');
+        handleCloseModal();
+        fetchSales(); // Refresh the sales list
+      } else {
+        console.error('Update failed:', result.message);
+        alert('Update failed: ' + result.message);
+      }
+    } catch (error) {
+      console.error('Error updating sale:', error);
+      alert('Error updating sale: ' + (error as any).message);
     }
   };
 
@@ -445,7 +527,6 @@ const Sales: React.FC = () => {
                       <td style={{ padding: '8px', border: '1px solid #ddd' }}>{sale.remark || '-'}</td>
                       <td style={{ padding: '8px', border: '1px solid #ddd' }}>{sale.sale_status_name || '-'}</td>
                       <td style={{ padding: '8px', border: '1px solid #ddd' }}>
-                        <button className="btn-icon" onClick={() => handleShow(sale.id)} title="View">👁️</button>
                         <button className="btn-icon" onClick={() => handleEdit(sale.id)} title="Edit">✏️</button>
                       </td>
                     </tr>
@@ -462,14 +543,1389 @@ const Sales: React.FC = () => {
           <div className="modal-content" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
               <h2>{isEditMode ? 'Edit Sale Record' : 'Sale Record Details'}</h2>
+              <small style={{color: 'var(--text-secondary)', fontSize: '0.8rem'}}>
+                Tab ID: {selectedSale?.sale_status_id} | Status: {selectedSale?.sale_status_name}
+              </small>
               <button className="modal-close" onClick={handleCloseModal}>×</button>
             </div>
             <div className="modal-body">
-              <div className="detail-grid">
-                <div className="detail-item">
-                  <label>လ (Month):</label>
-                  <span>{selectedSale.month || '-'}</span>
+              {isEditMode ? (
+                <div className="edit-form">
+                  <div className="form-grid">
+                    {/* Common Fields for All Tabs */}
+                    <div className="form-group">
+                      <label>လ (Month):</label>
+                      <select value={selectedSale.month || ''} onChange={(e) => setSelectedSale({...selectedSale, month: parseInt(e.target.value) || 0})}>
+                        <option value="">Select Month</option>
+                        <option value="1">January</option>
+                        <option value="2">February</option>
+                        <option value="3">March</option>
+                        <option value="4">April</option>
+                        <option value="5">May</option>
+                        <option value="6">June</option>
+                        <option value="7">July</option>
+                        <option value="8">August</option>
+                        <option value="9">September</option>
+                        <option value="10">October</option>
+                        <option value="11">November</option>
+                        <option value="12">December</option>
+                      </select>
+                    </div>
+                    <div className="form-group">
+                      <label>ပစ္စည်း ကုတ်အမှတ် (Item Code):</label>
+                      <input type="text" value={selectedSale.item_code || ''} onChange={(e) => setSelectedSale({...selectedSale, item_code: e.target.value})} />
+                    </div>
+                    <div className="form-group">
+                      <label>အရေအတွက် (Quantity):</label>
+                      <input type="number" value={selectedSale.quantity || ''} onChange={(e) => setSelectedSale({...selectedSale, quantity: parseFloat(e.target.value) || 0})} />
+                    </div>
+                    <div className="form-group">
+                      <label>စုစုပေါင်း အလေးချိန် (Total Weight):</label>
+                      <input type="number" step="0.01" value={selectedSale.total_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, total_weight: parseFloat(e.target.value) || 0})} />
+                    </div>
+
+                    {/* Dia RC Tab Specific Fields */}
+                    {(() => {
+                      console.log('Debug - Sale Status ID:', selectedSale?.sale_status_id);
+                      console.log('Debug - Selected Sale:', selectedSale);
+                      return selectedSale.sale_status_id === 1;
+                    })() && (
+                      <>
+                        <div className="form-group">
+                          <label>ဆိုင်ခွဲအမှတ် (Branch ID):</label>
+                          <select value={selectedSale.branch_id || ''} onChange={(e) => setSelectedSale({...selectedSale, branch_id: parseInt(e.target.value) || 0})}>
+                            <option value="">Select Branch</option>
+                            {branches.map(branch => (
+                              <option key={branch.id} value={branch.id}>
+                                {branch.name} (ID: {branch.id})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>ရက်စွဲ (Date):</label>
+                          <input type="date" value={selectedSale.date ? new Date(selectedSale.date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedSale({...selectedSale, date: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပစ္စည်းအမျိုးအစား (Item Categories):</label>
+                          <input type="text" value={selectedSale.item_categories || ''} onChange={(e) => setSelectedSale({...selectedSale, item_categories: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>စုစုပေါင်း အလေးချိန် (Total Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.total_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, total_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေချိန် (Gold Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gold_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျောက်ချိန် (Gem Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gem_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gem_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲရည် (Density):</label>
+                          <input type="text" value={selectedSale.density || ''} onChange={(e) => setSelectedSale({...selectedSale, density: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေဈေးနူန်း (Gold Price):</label>
+                          <input type="number" value={selectedSale.gold_price || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_price: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အထည် ဂရမ် (W Gram):</label>
+                          <input type="number" step="0.01" value={selectedSale.w_gram || ''} onChange={(e) => setSelectedSale({...selectedSale, w_gram: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ် (K):</label>
+                          <input type="number" step="0.01" value={selectedSale.k || ''} onChange={(e) => setSelectedSale({...selectedSale, k: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲ (P):</label>
+                          <input type="number" step="0.01" value={selectedSale.p || ''} onChange={(e) => setSelectedSale({...selectedSale, p: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွေး (Y):</label>
+                          <input type="number" step="0.01" value={selectedSale.y || ''} onChange={(e) => setSelectedSale({...selectedSale, y: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုး (Gold Value):</label>
+                          <input type="number" value={selectedSale.gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ်သား (Kyattar):</label>
+                          <input type="number" step="0.01" value={selectedSale.kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Round Kyattar:</label>
+                          <input type="number" step="0.01" value={selectedSale.round_kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, round_kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ဂရမ် (Loss Gram):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_gram || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_gram: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ကျပ် (Loss K):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_k || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_k: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ပဲ (Loss P):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_p || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_p: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ရွေး (Loss Y):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_y || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_y: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့တန်ဖိုး (Loss Value):</label>
+                          <input type="number" value={selectedSale.loss_value || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုးစုစုပေါင်း (Total Gold Value):</label>
+                          <input type="number" value={selectedSale.total_gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, total_gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>စိန်/ကျောက် တန်ဖိုး (Dia/Gem Value):</label>
+                          <input type="number" value={selectedSale.dia_gem_value || ''} onChange={(e) => setSelectedSale({...selectedSale, dia_gem_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>စုစုပေါင်း ပစ္စည်းတန်ဖိုး (Total Value):</label>
+                          <input type="number" value={selectedSale.total_value || ''} onChange={(e) => setSelectedSale({...selectedSale, total_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Purchase Voucher Amount:</label>
+                          <input type="number" value={selectedSale.sale_voucher_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, sale_voucher_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Different Amount:</label>
+                          <input type="number" value={selectedSale.different_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, different_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Stamp:</label>
+                          <input type="number" value={selectedSale.stamp || ''} onChange={(e) => setSelectedSale({...selectedSale, stamp: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Total Amount (Voucher+Stamp):</label>
+                          <input type="number" value={selectedSale.total_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, total_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပြေစာအမှတ် (Invoice Number):</label>
+                          <input type="text" value={selectedSale.invoice_number || ''} onChange={(e) => setSelectedSale({...selectedSale, invoice_number: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဝယ်ယူသူအမည် (Customer Name):</label>
+                          <input type="text" value={selectedSale.customer_name || ''} onChange={(e) => setSelectedSale({...selectedSale, customer_name: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>မှတ်ပုံတင်အမှတ် (NRC No):</label>
+                          <input type="text" value={selectedSale.nrc_no || ''} onChange={(e) => setSelectedSale({...selectedSale, nrc_no: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဖုန်းနံပါတ် (Phone No):</label>
+                          <input type="text" value={selectedSale.phone_no || ''} onChange={(e) => setSelectedSale({...selectedSale, phone_no: e.target.value})} />
+                        </div>
+                        <div className="form-group full-width">
+                          <label>လိပ်စာ (Address):</label>
+                          <input type="text" value={selectedSale.address || ''} onChange={(e) => setSelectedSale({...selectedSale, address: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Type (Transaction Type):</label>
+                          <input type="text" value={selectedSale.transcation_type || ''} onChange={(e) => setSelectedSale({...selectedSale, transcation_type: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Sale Name (Employee):</label>
+                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
+                            const employeeId = parseInt(e.target.value);
+                            const employee = employees.find(emp => emp.id === employeeId);
+                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
+                          }}>
+                            <option value="">Select Employee</option>
+                            {employees.map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </>
+                    )}
+
+                    {/* G RC Tab Specific Fields */}
+                    {selectedSale.sale_status_id === 2 && (
+                      <>
+                        <div className="form-group">
+                          <label>ဆိုင်ခွဲအမှတ် (Branch ID):</label>
+                          <select value={selectedSale.branch_id || ''} onChange={(e) => setSelectedSale({...selectedSale, branch_id: parseInt(e.target.value) || 0})}>
+                            <option value="">Select Branch</option>
+                            {branches.map(branch => (
+                              <option key={branch.id} value={branch.id}>
+                                {branch.name} (ID: {branch.id})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>ရက်စွဲ (Date):</label>
+                          <input type="date" value={selectedSale.date ? new Date(selectedSale.date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedSale({...selectedSale, date: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပစ္စည်းအမျိုးအစား (Item Categories):</label>
+                          <input type="text" value={selectedSale.item_categories || ''} onChange={(e) => setSelectedSale({...selectedSale, item_categories: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေချိန် (Gold Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gold_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲရည် (Density):</label>
+                          <input type="text" value={selectedSale.density || ''} onChange={(e) => setSelectedSale({...selectedSale, density: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေဈေးနူန်း (Gold Price):</label>
+                          <input type="number" value={selectedSale.gold_price || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_price: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ် (K):</label>
+                          <input type="number" step="0.01" value={selectedSale.k || ''} onChange={(e) => setSelectedSale({...selectedSale, k: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲ (P):</label>
+                          <input type="number" step="0.01" value={selectedSale.p || ''} onChange={(e) => setSelectedSale({...selectedSale, p: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွေး (Y):</label>
+                          <input type="number" step="0.01" value={selectedSale.y || ''} onChange={(e) => setSelectedSale({...selectedSale, y: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုး (Gold Value):</label>
+                          <input type="number" value={selectedSale.gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ်သား (Kyattar):</label>
+                          <input type="number" step="0.01" value={selectedSale.kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Round Kyattar:</label>
+                          <input type="number" step="0.01" value={selectedSale.round_kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, round_kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ကျပ် (Loss K):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_k || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_k: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ပဲ (Loss P):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_p || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_p: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ရွေး (Loss Y):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_y || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_y: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ဂရမ် (Loss Gram):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_gram || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_gram: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့တန်ဖိုး (Loss Value):</label>
+                          <input type="number" value={selectedSale.loss_value || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုးစုစုပေါင်း (Total Gold Value):</label>
+                          <input type="number" value={selectedSale.total_gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, total_gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>လက်ခ/အခြား (Charges & Other):</label>
+                          <input type="number" value={selectedSale.charges_and_other || ''} onChange={(e) => setSelectedSale({...selectedSale, charges_and_other: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>စုစုပေါင်း ပစ္စည်းတန်ဖိုး (Total Value):</label>
+                          <input type="number" value={selectedSale.total_value || ''} onChange={(e) => setSelectedSale({...selectedSale, total_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Sale Voucher Amount:</label>
+                          <input type="number" value={selectedSale.sale_voucher_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, sale_voucher_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Different Amount:</label>
+                          <input type="number" value={selectedSale.different_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, different_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပြေစာအမှတ် (Invoice Number):</label>
+                          <input type="text" value={selectedSale.invoice_number || ''} onChange={(e) => setSelectedSale({...selectedSale, invoice_number: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဝယ်ယူသူအမည် (Customer Name):</label>
+                          <input type="text" value={selectedSale.customer_name || ''} onChange={(e) => setSelectedSale({...selectedSale, customer_name: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>မှတ်ပုံတင်အမှတ် (NRC No):</label>
+                          <input type="text" value={selectedSale.nrc_no || ''} onChange={(e) => setSelectedSale({...selectedSale, nrc_no: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဖုန်းနံပါတ် (Phone No):</label>
+                          <input type="text" value={selectedSale.phone_no || ''} onChange={(e) => setSelectedSale({...selectedSale, phone_no: e.target.value})} />
+                        </div>
+                        <div className="form-group full-width">
+                          <label>လိပ်စာ (Address):</label>
+                          <input type="text" value={selectedSale.address || ''} onChange={(e) => setSelectedSale({...selectedSale, address: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Type (Transaction Type):</label>
+                          <input type="text" value={selectedSale.transcation_type || ''} onChange={(e) => setSelectedSale({...selectedSale, transcation_type: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Sale Name (Employee):</label>
+                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
+                            const employeeId = parseInt(e.target.value);
+                            const employee = employees.find(emp => emp.id === employeeId);
+                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
+                          }}>
+                            <option value="">Select Employee</option>
+                            {employees.map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group full-width">
+                          <label>မှတ်ချက် (Remark):</label>
+                          <input type="text" value={selectedSale.remark || ''} onChange={(e) => setSelectedSale({...selectedSale, remark: e.target.value})} />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Dia Sale Tab Specific Fields */}
+                    {selectedSale.sale_status_id === 4 && (
+                      <>
+                        <div className="form-group">
+                          <label>ဆိုင်ခွဲအမှတ် (Branch ID):</label>
+                          <select value={selectedSale.branch_id || ''} onChange={(e) => setSelectedSale({...selectedSale, branch_id: parseInt(e.target.value) || 0})}>
+                            <option value="">Select Branch</option>
+                            {branches.map(branch => (
+                              <option key={branch.id} value={branch.id}>
+                                {branch.name} (ID: {branch.id})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>ရက်စွဲ (Date):</label>
+                          <input type="date" value={selectedSale.date ? new Date(selectedSale.date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedSale({...selectedSale, date: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပစ္စည်းအမျိုးအစား (Item Categories):</label>
+                          <input type="text" value={selectedSale.item_categories || ''} onChange={(e) => setSelectedSale({...selectedSale, item_categories: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>စိန်ပွင့်ရေ (Diamond Qty):</label>
+                          <input type="number" value={selectedSale.dia_qty || ''} onChange={(e) => setSelectedSale({...selectedSale, dia_qty: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျောက်ပွင့်ရေ (Gem Qty):</label>
+                          <input type="number" value={selectedSale.gem_qty || ''} onChange={(e) => setSelectedSale({...selectedSale, gem_qty: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>စုစုပေါင်း အလေးချိန် (Total Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.total_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, total_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေချိန် (Gold Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gold_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျောက်ချိန် (Gem Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gem_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gem_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲရည် (Density):</label>
+                          <input type="text" value={selectedSale.density || ''} onChange={(e) => setSelectedSale({...selectedSale, density: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေဈေးနူန်း (Gold Price):</label>
+                          <input type="number" value={selectedSale.gold_price || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_price: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အထည် ဂရမ် (W Gram):</label>
+                          <input type="number" step="0.01" value={selectedSale.w_gram || ''} onChange={(e) => setSelectedSale({...selectedSale, w_gram: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ် (K):</label>
+                          <input type="number" step="0.01" value={selectedSale.k || ''} onChange={(e) => setSelectedSale({...selectedSale, k: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲ (P):</label>
+                          <input type="number" step="0.01" value={selectedSale.p || ''} onChange={(e) => setSelectedSale({...selectedSale, p: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွေး (Y):</label>
+                          <input type="number" step="0.01" value={selectedSale.y || ''} onChange={(e) => setSelectedSale({...selectedSale, y: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုး (Gold Value):</label>
+                          <input type="number" value={selectedSale.gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ်သား (Kyattar):</label>
+                          <input type="number" step="0.01" value={selectedSale.kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Round Kyattar:</label>
+                          <input type="number" step="0.01" value={selectedSale.round_kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, round_kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ဂရမ် (Loss Gram):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_gram || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_gram: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ကျပ် (Loss K):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_k || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_k: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ပဲ (Loss P):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_p || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_p: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ရွေး (Loss Y):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_y || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_y: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့တန်ဖိုး (Loss Value):</label>
+                          <input type="number" value={selectedSale.loss_value || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုးစုစုပေါင်း (Total Gold Value):</label>
+                          <input type="number" value={selectedSale.total_gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, total_gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>စိန်/ကျောက် တန်ဖိုး (Dia/Gem Value):</label>
+                          <input type="number" value={selectedSale.dia_gem_value || ''} onChange={(e) => setSelectedSale({...selectedSale, dia_gem_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>စုစုပေါင်း ပစ္စည်းတန်ဖိုး (Total Value):</label>
+                          <input type="number" value={selectedSale.total_value || ''} onChange={(e) => setSelectedSale({...selectedSale, total_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Sale Voucher Amount:</label>
+                          <input type="number" value={selectedSale.sale_voucher_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, sale_voucher_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Different Amount:</label>
+                          <input type="number" value={selectedSale.different_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, different_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Stamp:</label>
+                          <input type="number" value={selectedSale.stamp || ''} onChange={(e) => setSelectedSale({...selectedSale, stamp: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Total Amount (Voucher+Stamp):</label>
+                          <input type="number" value={selectedSale.total_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, total_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပြေစာအမှတ် (Invoice Number):</label>
+                          <input type="text" value={selectedSale.invoice_number || ''} onChange={(e) => setSelectedSale({...selectedSale, invoice_number: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဝယ်ယူသူအမည် (Customer Name):</label>
+                          <input type="text" value={selectedSale.customer_name || ''} onChange={(e) => setSelectedSale({...selectedSale, customer_name: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>မှတ်ပုံတင်အမှတ် (NRC No):</label>
+                          <input type="text" value={selectedSale.nrc_no || ''} onChange={(e) => setSelectedSale({...selectedSale, nrc_no: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဖုန်းနံပါတ် (Phone No):</label>
+                          <input type="text" value={selectedSale.phone_no || ''} onChange={(e) => setSelectedSale({...selectedSale, phone_no: e.target.value})} />
+                        </div>
+                        <div className="form-group full-width">
+                          <label>လိပ်စာ (Address):</label>
+                          <input type="text" value={selectedSale.address || ''} onChange={(e) => setSelectedSale({...selectedSale, address: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Transaction Type:</label>
+                          <input type="text" value={selectedSale.transcation_type || ''} onChange={(e) => setSelectedSale({...selectedSale, transcation_type: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Prefix:</label>
+                          <input type="text" value={selectedSale.prefix || ''} onChange={(e) => setSelectedSale({...selectedSale, prefix: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Sale Name (Employee):</label>
+                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
+                            const employeeId = parseInt(e.target.value);
+                            const employee = employees.find(emp => emp.id === employeeId);
+                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
+                          }}>
+                            <option value="">Select Employee</option>
+                            {employees.map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>On/Off:</label>
+                          <select value={selectedSale.on_off || ''} onChange={(e) => setSelectedSale({...selectedSale, on_off: e.target.value as 'online' | 'offline'})}>
+                            <option value="">Select</option>
+                            <option value="online">Online</option>
+                            <option value="offline">Offline</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Change (%):</label>
+                          <input type="number" step="0.01" value={selectedSale.change || ''} onChange={(e) => setSelectedSale({...selectedSale, change: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Return (%):</label>
+                          <input type="number" step="0.01" value={selectedSale.return || ''} onChange={(e) => setSelectedSale({...selectedSale, return: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Goldsmith Date:</label>
+                          <input type="date" value={selectedSale.gs_date ? new Date(selectedSale.gs_date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedSale({...selectedSale, gs_date: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Dia & Gem:</label>
+                          <select value={selectedSale.dia_and_gem || ''} onChange={(e) => setSelectedSale({...selectedSale, dia_and_gem: e.target.value as 'diamond' | 'gem'})}>
+                            <option value="">Select</option>
+                            <option value="diamond">Diamond</option>
+                            <option value="gem">Gem</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>New/Return:</label>
+                          <select value={selectedSale.status || ''} onChange={(e) => setSelectedSale({...selectedSale, status: e.target.value as 'new' | 'return'})}>
+                            <option value="">Select</option>
+                            <option value="new">New</option>
+                            <option value="return">Return</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Ready to Sale Amount:</label>
+                          <input type="number" value={selectedSale.real_to_payment_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, real_to_payment_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                      </>
+                    )}
+
+                    {/* Original Dia Sale Tab (ID: 2) */}
+                    {selectedSale.sale_status_id === 2 && (
+                      <>
+                        <div className="form-group">
+                          <label>ဆိုင်ခွဲအမှတ် (Branch ID):</label>
+                          <select value={selectedSale.branch_id || ''} onChange={(e) => setSelectedSale({...selectedSale, branch_id: parseInt(e.target.value) || 0})}>
+                            <option value="">Select Branch</option>
+                            {branches.map(branch => (
+                              <option key={branch.id} value={branch.id}>
+                                {branch.name} (ID: {branch.id})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>ရက်စွဲ (Date):</label>
+                          <input type="date" value={selectedSale.date ? new Date(selectedSale.date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedSale({...selectedSale, date: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပစ္စည်းအမျိုးအစား (Item Categories):</label>
+                          <input type="text" value={selectedSale.item_categories || ''} onChange={(e) => setSelectedSale({...selectedSale, item_categories: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>စိန်ပွင့်ရေ (Dia Qty):</label>
+                          <input type="number" value={selectedSale.dia_qty || ''} onChange={(e) => setSelectedSale({...selectedSale, dia_qty: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျောက်ပွင့်ရေ (Gem Qty):</label>
+                          <input type="number" value={selectedSale.gem_qty || ''} onChange={(e) => setSelectedSale({...selectedSale, gem_qty: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေချိန် (Gold Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gold_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျောက်ချိန် (Gem Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gem_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gem_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲရည် (Density):</label>
+                          <input type="text" value={selectedSale.density || ''} onChange={(e) => setSelectedSale({...selectedSale, density: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေဈေးနူန်း (Gold Price):</label>
+                          <input type="number" value={selectedSale.gold_price || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_price: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ် (K):</label>
+                          <input type="number" step="0.01" value={selectedSale.k || ''} onChange={(e) => setSelectedSale({...selectedSale, k: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲ (P):</label>
+                          <input type="number" step="0.01" value={selectedSale.p || ''} onChange={(e) => setSelectedSale({...selectedSale, p: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွေး (Y):</label>
+                          <input type="number" step="0.01" value={selectedSale.y || ''} onChange={(e) => setSelectedSale({...selectedSale, y: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အထည်ဂရမ် (W Gram):</label>
+                          <input type="number" step="0.01" value={selectedSale.w_gram || ''} onChange={(e) => setSelectedSale({...selectedSale, w_gram: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုး (Gold Value):</label>
+                          <input type="number" value={selectedSale.gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ်သား (Kyattar):</label>
+                          <input type="number" step="0.01" value={selectedSale.kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Round Kyattar:</label>
+                          <input type="number" step="0.01" value={selectedSale.round_kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, round_kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ဂရမ် (Loss Gram):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_gram || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_gram: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့တန်ဖိုး (Loss Value):</label>
+                          <input type="number" value={selectedSale.loss_value || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုးစုစုပေါင်း (Total Gold Value):</label>
+                          <input type="number" value={selectedSale.total_gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, total_gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>စိန်/ကျောက်တန်ဖိုး (Dia Gem Value):</label>
+                          <input type="number" value={selectedSale.dia_gem_value || ''} onChange={(e) => setSelectedSale({...selectedSale, dia_gem_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>စုစုပေါင်းတန်ဖိုး (Total Value):</label>
+                          <input type="number" value={selectedSale.total_value || ''} onChange={(e) => setSelectedSale({...selectedSale, total_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Sale Voucher Amount:</label>
+                          <input type="number" value={selectedSale.sale_voucher_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, sale_voucher_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Different Amount:</label>
+                          <input type="number" value={selectedSale.different_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, different_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Stamp:</label>
+                          <input type="number" value={selectedSale.stamp || ''} onChange={(e) => setSelectedSale({...selectedSale, stamp: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Total Amount:</label>
+                          <input type="number" value={selectedSale.total_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, total_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပြေစာအမှတ် (Invoice Number):</label>
+                          <input type="text" value={selectedSale.invoice_number || ''} onChange={(e) => setSelectedSale({...selectedSale, invoice_number: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဝယ်ယူသူအမည် (Customer Name):</label>
+                          <input type="text" value={selectedSale.customer_name || ''} onChange={(e) => setSelectedSale({...selectedSale, customer_name: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>မှတ်ပုံတင်အမှတ် (NRC No):</label>
+                          <input type="text" value={selectedSale.nrc_no || ''} onChange={(e) => setSelectedSale({...selectedSale, nrc_no: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဖုန်းနံပါတ် (Phone No):</label>
+                          <input type="text" value={selectedSale.phone_no || ''} onChange={(e) => setSelectedSale({...selectedSale, phone_no: e.target.value})} />
+                        </div>
+                        <div className="form-group full-width">
+                          <label>လိပ်စာ (Address):</label>
+                          <input type="text" value={selectedSale.address || ''} onChange={(e) => setSelectedSale({...selectedSale, address: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အမျိုးအစား (Transaction Type):</label>
+                          <input type="text" value={selectedSale.transcation_type || ''} onChange={(e) => setSelectedSale({...selectedSale, transcation_type: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Prefix:</label>
+                          <input type="text" value={selectedSale.prefix || ''} onChange={(e) => setSelectedSale({...selectedSale, prefix: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Online/Offline:</label>
+                          <select value={selectedSale.on_off || ''} onChange={(e) => setSelectedSale({...selectedSale, on_off: e.target.value as 'online' | 'offline'})}>
+                            <option value="">Select</option>
+                            <option value="online">Online</option>
+                            <option value="offline">Offline</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Change %:</label>
+                          <input type="number" step="0.01" value={selectedSale.change || ''} onChange={(e) => setSelectedSale({...selectedSale, change: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Return %:</label>
+                          <input type="number" step="0.01" value={selectedSale.return || ''} onChange={(e) => setSelectedSale({...selectedSale, return: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        {/* <div className="form-group">
+                          <label>Goldsmith Date:</label>
+                          <input type="date" value={selectedSale.gs_date ? new Date(selectedSale.gs_date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedSale({...selectedSale, gs_date: e.target.value})} />
+                        </div> */}
+                        <div className="form-group">
+                          <label>Diamond/Gem:</label>
+                          <select value={selectedSale.dia_and_gem || ''} onChange={(e) => setSelectedSale({...selectedSale, dia_and_gem: e.target.value as 'diamond' | 'gem'})}>
+                            <option value="">Select</option>
+                            <option value="diamond">Diamond</option>
+                            <option value="gem">Gem</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Status (New/Return):</label>
+                          <select value={selectedSale.status || ''} onChange={(e) => setSelectedSale({...selectedSale, status: e.target.value as 'new' | 'return'})}>
+                            <option value="">Select</option>
+                            <option value="new">New</option>
+                            <option value="return">Return</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Real to Payment Amount:</label>
+                          <input type="number" value={selectedSale.real_to_payment_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, real_to_payment_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Sale Name (Employee):</label>
+                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
+                            const employeeId = parseInt(e.target.value);
+                            const employee = employees.find(emp => emp.id === employeeId);
+                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
+                          }}>
+                            <option value="">Select Employee</option>
+                            {employees.map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </>
+                    )}
+
+                    {/* G Sale Tab Specific Fields */}
+                    {selectedSale.sale_status_id === 3 && (
+                      <>
+                        <div className="form-group">
+                          <label>ဆိုင်ခွဲအမှတ် (Branch ID):</label>
+                          <select value={selectedSale.branch_id || ''} onChange={(e) => setSelectedSale({...selectedSale, branch_id: parseInt(e.target.value) || 0})}>
+                            <option value="">Select Branch</option>
+                            {branches.map(branch => (
+                              <option key={branch.id} value={branch.id}>
+                                {branch.name} (ID: {branch.id})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>ရက်စွဲ (Date):</label>
+                          <input type="date" value={selectedSale.date ? new Date(selectedSale.date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedSale({...selectedSale, date: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပစ္စည်းအမျိုးအစား (Item Categories):</label>
+                          <input type="text" value={selectedSale.item_categories || ''} onChange={(e) => setSelectedSale({...selectedSale, item_categories: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေချိန် (Gold Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gold_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျောက်ချိန် (Gem Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gem_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gem_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲရည် (Density):</label>
+                          <input type="text" value={selectedSale.density || ''} onChange={(e) => setSelectedSale({...selectedSale, density: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေဈေးနူန်း (Gold Price):</label>
+                          <input type="number" value={selectedSale.gold_price || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_price: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ် (K):</label>
+                          <input type="number" step="0.01" value={selectedSale.k || ''} onChange={(e) => setSelectedSale({...selectedSale, k: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲ (P):</label>
+                          <input type="number" step="0.01" value={selectedSale.p || ''} onChange={(e) => setSelectedSale({...selectedSale, p: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွေး (Y):</label>
+                          <input type="number" step="0.01" value={selectedSale.y || ''} onChange={(e) => setSelectedSale({...selectedSale, y: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုး (Gold Value):</label>
+                          <input type="number" value={selectedSale.gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ်သား (Kyattar):</label>
+                          <input type="number" step="0.01" value={selectedSale.kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Round Kyattar:</label>
+                          <input type="number" step="0.01" value={selectedSale.round_kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, round_kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ကျပ် (Loss K):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_k || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_k: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ပဲ (Loss P):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_p || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_p: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ရွေး (Loss Y):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_y || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_y: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ဂရမ် (Loss Gram):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_gram || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_gram: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့တန်ဖိုး (Loss Value):</label>
+                          <input type="number" value={selectedSale.loss_value || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုးစုစုပေါင်း (Total Gold Value):</label>
+                          <input type="number" value={selectedSale.total_gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, total_gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Purchase Voucher Amount:</label>
+                          <input type="number" value={selectedSale.sale_voucher_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, sale_voucher_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Different Amount:</label>
+                          <input type="number" value={selectedSale.different_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, different_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပြေစာအမှတ် (Invoice Number):</label>
+                          <input type="text" value={selectedSale.invoice_number || ''} onChange={(e) => setSelectedSale({...selectedSale, invoice_number: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဝယ်ယူသူအမည် (Customer Name):</label>
+                          <input type="text" value={selectedSale.customer_name || ''} onChange={(e) => setSelectedSale({...selectedSale, customer_name: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>မှတ်ပုံတင်အမှတ် (NRC No):</label>
+                          <input type="text" value={selectedSale.nrc_no || ''} onChange={(e) => setSelectedSale({...selectedSale, nrc_no: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဖုန်းနံပါတ် (Phone No):</label>
+                          <input type="text" value={selectedSale.phone_no || ''} onChange={(e) => setSelectedSale({...selectedSale, phone_no: e.target.value})} />
+                        </div>
+                        <div className="form-group full-width">
+                          <label>လိပ်စာ (Address):</label>
+                          <input type="text" value={selectedSale.address || ''} onChange={(e) => setSelectedSale({...selectedSale, address: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Type:</label>
+                          <input type="text" value={selectedSale.transcation_type || ''} onChange={(e) => setSelectedSale({...selectedSale, transcation_type: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Sale Name (Employee):</label>
+                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
+                            const employeeId = parseInt(e.target.value);
+                            const employee = employees.find(emp => emp.id === employeeId);
+                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
+                          }}>
+                            <option value="">Select Employee</option>
+                            {employees.map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </>
+                    )}
+
+                    {/* G Sale Tab 5 Specific Fields */}
+                    {selectedSale.sale_status_id === 5 && (
+                      <>
+                        <div className="form-group">
+                          <label>ဆိုင်ခွဲအမှတ် (Branch ID):</label>
+                          <select value={selectedSale.branch_id || ''} onChange={(e) => setSelectedSale({...selectedSale, branch_id: parseInt(e.target.value) || 0})}>
+                            <option value="">Select Branch</option>
+                            {branches.map(branch => (
+                              <option key={branch.id} value={branch.id}>
+                                {branch.name} (ID: {branch.id})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>ရက်စွဲ (Date):</label>
+                          <input type="date" value={selectedSale.date ? new Date(selectedSale.date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedSale({...selectedSale, date: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပစ္စည်းအမျိုးအစား (Item Categories):</label>
+                          <input type="text" value={selectedSale.item_categories || ''} onChange={(e) => setSelectedSale({...selectedSale, item_categories: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေချိန် (Gold Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gold_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲရည် (Density):</label>
+                          <input type="text" value={selectedSale.density || ''} onChange={(e) => setSelectedSale({...selectedSale, density: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေဈေးနူန်း (Gold Price):</label>
+                          <input type="number" value={selectedSale.gold_price || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_price: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အထည် ဂရမ် (W Gram):</label>
+                          <input type="number" step="0.01" value={selectedSale.w_gram || ''} onChange={(e) => setSelectedSale({...selectedSale, w_gram: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ် (K):</label>
+                          <input type="number" step="0.01" value={selectedSale.k || ''} onChange={(e) => setSelectedSale({...selectedSale, k: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲ (P):</label>
+                          <input type="number" step="0.01" value={selectedSale.p || ''} onChange={(e) => setSelectedSale({...selectedSale, p: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွေး (Y):</label>
+                          <input type="number" step="0.01" value={selectedSale.y || ''} onChange={(e) => setSelectedSale({...selectedSale, y: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုး (Gold Value):</label>
+                          <input type="number" value={selectedSale.gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ်သား (Kyattar):</label>
+                          <input type="number" step="0.01" value={selectedSale.kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Round Kyattar:</label>
+                          <input type="number" step="0.01" value={selectedSale.round_kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, round_kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ဂရမ် (Loss Gram):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_gram || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_gram: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ကျပ် (Loss K):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_k || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_k: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ပဲ (Loss P):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_p || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_p: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ရွေး (Loss Y):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_y || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_y: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့တန်ဖိုး (Loss Value):</label>
+                          <input type="number" value={selectedSale.loss_value || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုးစုစုပေါင်း (Total Gold Value):</label>
+                          <input type="number" value={selectedSale.total_gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, total_gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>လက်ခ/အခြား (Charges & Other):</label>
+                          <input type="number" value={selectedSale.charges_and_other || ''} onChange={(e) => setSelectedSale({...selectedSale, charges_and_other: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>စုစုပေါင်း ပစ္စည်းတန်ဖိုး (Total Value):</label>
+                          <input type="number" value={selectedSale.total_value || ''} onChange={(e) => setSelectedSale({...selectedSale, total_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Sale Voucher Amount:</label>
+                          <input type="number" value={selectedSale.sale_voucher_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, sale_voucher_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Different Amount:</label>
+                          <input type="number" value={selectedSale.different_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, different_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Stamp:</label>
+                          <input type="number" value={selectedSale.stamp || ''} onChange={(e) => setSelectedSale({...selectedSale, stamp: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Total Amount (Voucher+Stamp):</label>
+                          <input type="number" value={selectedSale.total_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, total_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပြေစာအမှတ် (Invoice Number):</label>
+                          <input type="text" value={selectedSale.invoice_number || ''} onChange={(e) => setSelectedSale({...selectedSale, invoice_number: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဝယ်ယူသူအမည် (Customer Name):</label>
+                          <input type="text" value={selectedSale.customer_name || ''} onChange={(e) => setSelectedSale({...selectedSale, customer_name: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>မှတ်ပုံတင်အမှတ် (NRC No):</label>
+                          <input type="text" value={selectedSale.nrc_no || ''} onChange={(e) => setSelectedSale({...selectedSale, nrc_no: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဖုန်းနံပါတ် (Phone No):</label>
+                          <input type="text" value={selectedSale.phone_no || ''} onChange={(e) => setSelectedSale({...selectedSale, phone_no: e.target.value})} />
+                        </div>
+                        <div className="form-group full-width">
+                          <label>လိပ်စာ (Address):</label>
+                          <input type="text" value={selectedSale.address || ''} onChange={(e) => setSelectedSale({...selectedSale, address: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Status (New/Return):</label>
+                          <select value={selectedSale.status || ''} onChange={(e) => setSelectedSale({...selectedSale, status: e.target.value as 'new' | 'return'})}>
+                            <option value="">Select</option>
+                            <option value="new">New</option>
+                            <option value="return">Return</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Transaction Type:</label>
+                          <input type="text" value={selectedSale.transcation_type || ''} onChange={(e) => setSelectedSale({...selectedSale, transcation_type: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Prefix:</label>
+                          <input type="text" value={selectedSale.prefix || ''} onChange={(e) => setSelectedSale({...selectedSale, prefix: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Sale Name (Employee):</label>
+                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
+                            const employeeId = parseInt(e.target.value);
+                            const employee = employees.find(emp => emp.id === employeeId);
+                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
+                          }}>
+                            <option value="">Select Employee</option>
+                            {employees.map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>On/Off:</label>
+                          <select value={selectedSale.on_off || ''} onChange={(e) => setSelectedSale({...selectedSale, on_off: e.target.value as 'online' | 'offline'})}>
+                            <option value="">Select</option>
+                            <option value="online">Online</option>
+                            <option value="offline">Offline</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Goldsmith Date:</label>
+                          <input type="date" value={selectedSale.gs_date ? new Date(selectedSale.gs_date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedSale({...selectedSale, gs_date: e.target.value})} />
+                        </div>
+                        <div className="form-group full-width">
+                          <label>မှတ်ချက် (Remark):</label>
+                          <input type="text" value={selectedSale.remark || ''} onChange={(e) => setSelectedSale({...selectedSale, remark: e.target.value})} />
+                        </div>
+                      </>
+                    )}
+
+                    {/* PT Sale Tab Specific Fields */}
+                    {selectedSale.sale_status_id === 6 && (
+                      <>
+                        <div className="form-group">
+                          <label>ဆိုင်ခွဲအမှတ် (Branch ID):</label>
+                          <select value={selectedSale.branch_id || ''} onChange={(e) => setSelectedSale({...selectedSale, branch_id: parseInt(e.target.value) || 0})}>
+                            <option value="">Select Branch</option>
+                            {branches.map(branch => (
+                              <option key={branch.id} value={branch.id}>
+                                {branch.name} (ID: {branch.id})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>ရက်စွဲ (Date):</label>
+                          <input type="date" value={selectedSale.date ? new Date(selectedSale.date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedSale({...selectedSale, date: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပစ္စည်းအမျိုးအစား (Item Categories):</label>
+                          <input type="text" value={selectedSale.item_categories || ''} onChange={(e) => setSelectedSale({...selectedSale, item_categories: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေချိန် (Gold Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gold_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျောက်ချိန် (Gem Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gem_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gem_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲရည် (Density):</label>
+                          <input type="text" value={selectedSale.density || ''} onChange={(e) => setSelectedSale({...selectedSale, density: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေဈေးနူန်း (Gold Price):</label>
+                          <input type="number" value={selectedSale.gold_price || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_price: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အထည် ဂရမ် (W Gram):</label>
+                          <input type="number" step="0.01" value={selectedSale.w_gram || ''} onChange={(e) => setSelectedSale({...selectedSale, w_gram: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ် (K):</label>
+                          <input type="number" step="0.01" value={selectedSale.k || ''} onChange={(e) => setSelectedSale({...selectedSale, k: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပဲ (P):</label>
+                          <input type="number" step="0.01" value={selectedSale.p || ''} onChange={(e) => setSelectedSale({...selectedSale, p: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွေး (Y):</label>
+                          <input type="number" step="0.01" value={selectedSale.y || ''} onChange={(e) => setSelectedSale({...selectedSale, y: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုး (Gold Value):</label>
+                          <input type="number" value={selectedSale.gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ကျပ်သား (Kyattar):</label>
+                          <input type="number" step="0.01" value={selectedSale.kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Round Kyattar:</label>
+                          <input type="number" step="0.01" value={selectedSale.round_kyattar || ''} onChange={(e) => setSelectedSale({...selectedSale, round_kyattar: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ဂရမ် (Loss Gram):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_gram || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_gram: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ကျပ် (Loss K):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_k || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_k: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ပဲ (Loss P):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_p || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_p: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့ ရွေး (Loss Y):</label>
+                          <input type="number" step="0.01" value={selectedSale.loss_y || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_y: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အလျော့တန်ဖိုး (Loss Value):</label>
+                          <input type="number" value={selectedSale.loss_value || ''} onChange={(e) => setSelectedSale({...selectedSale, loss_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေတန်ဖိုးစုစုပေါင်း (Total Gold Value):</label>
+                          <input type="number" value={selectedSale.total_gold_value || ''} onChange={(e) => setSelectedSale({...selectedSale, total_gold_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>စုစုပေါင်း ပစ္စည်းတန်ဖိုး (Total Value):</label>
+                          <input type="number" value={selectedSale.total_value || ''} onChange={(e) => setSelectedSale({...selectedSale, total_value: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Sale Voucher Amount:</label>
+                          <input type="number" value={selectedSale.sale_voucher_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, sale_voucher_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Different Amount:</label>
+                          <input type="number" value={selectedSale.different_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, different_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Stamp:</label>
+                          <input type="number" value={selectedSale.stamp || ''} onChange={(e) => setSelectedSale({...selectedSale, stamp: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Total Amount (Voucher+Stamp):</label>
+                          <input type="number" value={selectedSale.total_amount || ''} onChange={(e) => setSelectedSale({...selectedSale, total_amount: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပြေစာအမှတ် (Invoice Number):</label>
+                          <input type="text" value={selectedSale.invoice_number || ''} onChange={(e) => setSelectedSale({...selectedSale, invoice_number: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဝယ်ယူသူအမည် (Customer Name):</label>
+                          <input type="text" value={selectedSale.customer_name || ''} onChange={(e) => setSelectedSale({...selectedSale, customer_name: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>မှတ်ပုံတင်အမှတ် (NRC No):</label>
+                          <input type="text" value={selectedSale.nrc_no || ''} onChange={(e) => setSelectedSale({...selectedSale, nrc_no: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဖုန်းနံပါတ် (Phone No):</label>
+                          <input type="text" value={selectedSale.phone_no || ''} onChange={(e) => setSelectedSale({...selectedSale, phone_no: e.target.value})} />
+                        </div>
+                        <div className="form-group full-width">
+                          <label>လိပ်စာ (Address):</label>
+                          <input type="text" value={selectedSale.address || ''} onChange={(e) => setSelectedSale({...selectedSale, address: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Status (New/Return):</label>
+                          <select value={selectedSale.status || ''} onChange={(e) => setSelectedSale({...selectedSale, status: e.target.value as 'new' | 'return'})}>
+                            <option value="">Select</option>
+                            <option value="new">New</option>
+                            <option value="return">Return</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Transaction Type:</label>
+                          <input type="text" value={selectedSale.transcation_type || ''} onChange={(e) => setSelectedSale({...selectedSale, transcation_type: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Prefix:</label>
+                          <input type="text" value={selectedSale.prefix || ''} onChange={(e) => setSelectedSale({...selectedSale, prefix: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Sale Name (Employee):</label>
+                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
+                            const employeeId = parseInt(e.target.value);
+                            const employee = employees.find(emp => emp.id === employeeId);
+                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
+                          }}>
+                            <option value="">Select Employee</option>
+                            {employees.map((employee) => (
+                              <option key={employee.id} value={employee.id}>
+                                {employee.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>On/Off:</label>
+                          <select value={selectedSale.on_off || ''} onChange={(e) => setSelectedSale({...selectedSale, on_off: e.target.value as 'online' | 'offline'})}>
+                            <option value="">Select</option>
+                            <option value="online">Online</option>
+                            <option value="offline">Offline</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Change (%):</label>
+                          <input type="number" step="0.01" value={selectedSale.change || ''} onChange={(e) => setSelectedSale({...selectedSale, change: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Return (%):</label>
+                          <input type="number" step="0.01" value={selectedSale.return || ''} onChange={(e) => setSelectedSale({...selectedSale, return: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Goldsmith Date:</label>
+                          <input type="date" value={selectedSale.gs_date ? new Date(selectedSale.gs_date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedSale({...selectedSale, gs_date: e.target.value})} />
+                        </div>
+                      </>
+                    )}
+
+                    {/* G RC Tab Specific Fields */}
+                    {selectedSale.sale_status_id === 4 && (
+                      <>
+                        <div className="form-group">
+                          <label>ရွှေချိန် (Gold Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gold_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေဈေးနူန်း (Gold Price):</label>
+                          <input type="number" value={selectedSale.gold_price || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_price: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ပြေစာအမှတ် (Invoice Number):</label>
+                          <input type="text" value={selectedSale.invoice_number || ''} onChange={(e) => setSelectedSale({...selectedSale, invoice_number: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဝယ်ယူသူအမည် (Customer Name):</label>
+                          <input type="text" value={selectedSale.customer_name || ''} onChange={(e) => setSelectedSale({...selectedSale, customer_name: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>မှတ်ပုံတင်အမှတ် (NRC No):</label>
+                          <input type="text" value={selectedSale.nrc_no || ''} onChange={(e) => setSelectedSale({...selectedSale, nrc_no: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဖုန်းနံပါတ် (Phone No):</label>
+                          <input type="text" value={selectedSale.phone_no || ''} onChange={(e) => setSelectedSale({...selectedSale, phone_no: e.target.value})} />
+                        </div>
+                        <div className="form-group full-width">
+                          <label>လိပ်စာ (Address):</label>
+                          <input type="text" value={selectedSale.address || ''} onChange={(e) => setSelectedSale({...selectedSale, address: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အမျိုးအစား (Transaction Type):</label>
+                          <input type="text" value={selectedSale.transcation_type || ''} onChange={(e) => setSelectedSale({...selectedSale, transcation_type: e.target.value})} />
+                        </div>
+                      </>
+                    )}
+
+                    {/* PT Sale Tab Specific Fields */}
+                    {selectedSale.sale_status_id === 5 && (
+                      <>
+                        <div className="form-group">
+                          <label>ရွှေချိန် (Gold Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gold_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အထည်ဂရမ် (W Gram):</label>
+                          <input type="number" step="0.01" value={selectedSale.w_gram || ''} onChange={(e) => setSelectedSale({...selectedSale, w_gram: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေဈေးနူန်း (Gold Price):</label>
+                          <input type="number" value={selectedSale.gold_price || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_price: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Prefix:</label>
+                          <input type="text" value={selectedSale.prefix || ''} onChange={(e) => setSelectedSale({...selectedSale, prefix: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Online/Offline:</label>
+                          <select value={selectedSale.on_off || ''} onChange={(e) => setSelectedSale({...selectedSale, on_off: e.target.value as 'online' | 'offline'})}>
+                            <option value="">Select</option>
+                            <option value="online">Online</option>
+                            <option value="offline">Offline</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>Change %:</label>
+                          <input type="number" step="0.01" value={selectedSale.change || ''} onChange={(e) => setSelectedSale({...selectedSale, change: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Return %:</label>
+                          <input type="number" step="0.01" value={selectedSale.return || ''} onChange={(e) => setSelectedSale({...selectedSale, return: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Goldsmith Date:</label>
+                          <input type="date" value={selectedSale.gs_date ? new Date(selectedSale.gs_date).toISOString().split('T')[0] : ''} onChange={(e) => setSelectedSale({...selectedSale, gs_date: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>Status (New/Return):</label>
+                          <select value={selectedSale.status || ''} onChange={(e) => setSelectedSale({...selectedSale, status: e.target.value as 'new' | 'return'})}>
+                            <option value="">Select</option>
+                            <option value="new">New</option>
+                            <option value="return">Return</option>
+                          </select>
+                        </div>
+                        <div className="form-group">
+                          <label>ဝယ်ယူသူအမည် (Customer Name):</label>
+                          <input type="text" value={selectedSale.customer_name || ''} onChange={(e) => setSelectedSale({...selectedSale, customer_name: e.target.value})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ဖုန်းနံပါတ် (Phone No):</label>
+                          <input type="text" value={selectedSale.phone_no || ''} onChange={(e) => setSelectedSale({...selectedSale, phone_no: e.target.value})} />
+                        </div>
+                      </>
+                    )}
+
+                    {/* PT RC Tab Specific Fields */}
+                    {selectedSale.sale_status_id === 6 && (
+                      <>
+                        <div className="form-group">
+                          <label>ရွှေချိန် (Gold Weight):</label>
+                          <input type="number" step="0.01" value={selectedSale.gold_weight || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_weight: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>ရွှေဈေးနူန်း (Gold Price):</label>
+                          <input type="number" value={selectedSale.gold_price || ''} onChange={(e) => setSelectedSale({...selectedSale, gold_price: parseFloat(e.target.value) || 0})} />
+                        </div>
+                        <div className="form-group">
+                          <label>အမျိုးအစား (Transaction Type):</label>
+                          <input type="text" value={selectedSale.transcation_type || ''} onChange={(e) => setSelectedSale({...selectedSale, transcation_type: e.target.value})} />
+                        </div>
+                      </>
+                    )}
+
+                    <div className="form-group full-width">
+                      <label>မှတ်ချက် (Remark):</label>
+                      <textarea value={selectedSale.remark || ''} onChange={(e) => setSelectedSale({...selectedSale, remark: e.target.value})} />
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                <div className="detail-grid">
+                  <div className="detail-item">
+                    <label>လ (Month):</label>
+                    <span>{selectedSale.month || '-'}</span>
+                  </div>
                 <div className="detail-item">
                   <label>ဆိုင်ခွဲအမှတ် (Branch):</label>
                   <span>{selectedSale.branch_name || '-'}</span>
@@ -656,14 +2112,22 @@ const Sales: React.FC = () => {
                   <label>Employee:</label>
                   <span>{selectedSale.employee_name || '-'}</span>
                 </div>
-                <div className="detail-item full-width">
+                <div className="detail-item">
                   <label>မှတ်ချက် (Remark):</label>
                   <span>{selectedSale.remark || '-'}</span>
                 </div>
               </div>
+              )}
             </div>
             <div className="modal-footer">
-              <button className="btn-secondary" onClick={handleCloseModal}>Close</button>
+              {isEditMode ? (
+                <>
+                  <button className="btn-primary" onClick={handleUpdate}>Update</button>
+                  <button className="btn-secondary" onClick={handleCloseModal}>Cancel</button>
+                </>
+              ) : (
+                <button className="btn-secondary" onClick={handleCloseModal}>Close</button>
+              )}
             </div>
           </div>
         </div>

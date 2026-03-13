@@ -1,7 +1,7 @@
-import { app, BrowserWindow } from 'electron';
-import * as path from 'path';
+const { app, BrowserWindow } = require('electron');
+const path = require('path');
 
-let mainWindow: BrowserWindow | null = null;
+let mainWindow = null;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -17,7 +17,7 @@ function createWindow() {
   });
 
   if (process.env.NODE_ENV === 'development') {
-    mainWindow.loadURL('http://localhost:5173');
+    mainWindow.loadURL('https://saleapp.29jewellery.com');
     mainWindow.webContents.openDevTools();
   } else {
     mainWindow.loadFile(path.join(__dirname, '../dist/index.html'));

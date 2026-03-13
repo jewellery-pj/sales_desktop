@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { saleAnalyticsAPI } from '../services/api';
+import SuccessModal from '../components/SuccessModal';
+import InvoicePrint from '../components/InvoicePrint';
 import '../styles/SaleStatus.css';
 
 type SaleTab = 'dia-rc' | 'g-rc' | 'pt-rc' | 'dia-sale' | 'g-sale' | 'pt-sale';
@@ -135,12 +137,17 @@ const DiaRCForm: React.FC = () => {
     remark: '',
     sale_status_id: '1', // Dia RC tab ID
     w_gram: '',
+    cashier_id: '', // Add missing cashier_id
   });
 
   const [branches, setBranches] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
-
+  const [isSuccess, setIsSuccess] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showInvoicePrint, setShowInvoicePrint] = useState(false);
+  const [savedRecordId, setSavedRecordId] = useState('');
+  
   useEffect(() => {
     fetchBranches();
     fetchEmployees();
@@ -266,8 +273,7 @@ const DiaRCForm: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      
+      const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
       const sanitizedData = {
         ...formData,
         quantity: formData.quantity || 0,
@@ -294,6 +300,7 @@ const DiaRCForm: React.FC = () => {
         different_amount: formData.different_amount || 0,
         stamp: formData.stamp || 0,
         total_amount: formData.total_amount || 0,
+        cashier_id: userData.id || null, // Add logged in user ID
       };
       
       const response = await saleAnalyticsAPI.createRecord(sanitizedData);
@@ -301,54 +308,15 @@ const DiaRCForm: React.FC = () => {
       const result = response.data;
       
       if (result.success) {
-        alert('Record created successfully!');
-        setFormData({
-          month: new Date().getMonth() + 1,
-          branch_id: formData.branch_id,
-          date: new Date().toISOString().split('T')[0],
-          item_code: '',
-          item_categories: '',
-          quantity: '',
-          total_weight: '',
-          gold_weight: '',
-          gem_weight: '',
-          density: '',
-          gold_price: '',
-          k: '',
-          p: '',
-          y: '',
-          gold_value: '',
-          kyattar: '',
-          round_kyattar: '',
-          loss_k: '',
-          loss_p: '',
-          loss_y: '',
-          loss_gram: '',
-          loss_value: '',
-          total_gold_value: '',
-          dia_gem_value: '',
-          total_value: '',
-          sale_voucher_amount: '',
-          different_amount: '',
-          stamp: '',
-          total_amount: '',
-          invoice_number: '',
-          customer_name: '',
-          nrc_no: '',
-          phone_no: '',
-          address: '',
-          transcation_type: '',
-          employee_id: '',
-          remark: '',
-          sale_status_id: '1',
-          w_gram: '',
-        });
+        setIsSuccess(true);
+        setSavedRecordId(result.data?.id || 'Unknown');
+        setShowSuccessModal(true);
       } else {
-        alert(result.message || 'Failed to create record');
+        alert('Failed to create record: ' + (result.message || 'Unknown error'));
       }
-    } catch (error) {
-      console.error('Error submitting form:', error);
-      alert('Error submitting form');
+    } catch (error: any) {
+      console.error('Error creating record:', error);
+      alert('Error creating record: ' + (error.response?.data?.message || error.message || 'Unknown error'));
     } finally {
       setLoading(false);
     }
@@ -750,6 +718,51 @@ const DiaRCForm: React.FC = () => {
             </select>
           </div>
 
+          <div className="form-group">
+            <label>ပြေစာအမှတ် (Invoice Number)</label>
+            <input
+              type="text"
+              value={formData.invoice_number}
+              onChange={(e) => setFormData({ ...formData, invoice_number: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>ဝယ်ယူသူအမည် (Customer Name)</label>
+            <input
+              type="text"
+              value={formData.customer_name}
+              onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>မှတ်ပုံတင်အမှတ် (NRC No)</label>
+            <input
+              type="text"
+              value={formData.nrc_no}
+              onChange={(e) => setFormData({ ...formData, nrc_no: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group">
+            <label>ဖုန်းနံပါတ် (Phone No)</label>
+            <input
+              type="text"
+              value={formData.phone_no}
+              onChange={(e) => setFormData({ ...formData, phone_no: e.target.value })}
+            />
+          </div>
+
+          <div className="form-group full-width">
+            <label>လိပ်စာ (Address)</label>
+            <input
+              type="text"
+              value={formData.address}
+              onChange={(e) => setFormData({ ...formData, address: e.target.value })}
+            />
+          </div>
+
           <div className="form-group full-width">
             <label>မှတ်ချက် (Remark)</label>
             <textarea
@@ -764,8 +777,51 @@ const DiaRCForm: React.FC = () => {
           <button type="submit" className="btn-primary" disabled={loading}>
             {loading ? 'Saving...' : 'Save Record'}
           </button>
+          {isSuccess && (
+            <button 
+              type="button" 
+              className="btn-success" 
+              onClick={() => alert('Invoice generation coming soon!')}
+              style={{ marginLeft: '10px' }}
+            >
+              📄 Generate Invoice
+            </button>
+          )}
         </div>
       </form>
+      
+      {/* Success Modal */}
+      <SuccessModal
+        open={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        recordId={savedRecordId}
+        recordType="Dia RC Record"
+        onPrintInvoice={() => setShowInvoicePrint(true)}
+      />
+      
+      {/* Invoice Print */}
+      {showInvoicePrint && (
+        <InvoicePrint
+          data={{
+            id: savedRecordId,
+            customerName: formData.customer_name || 'N/A',
+            items: [
+              {
+                name: formData.item_code || 'Diamond/Stone Item',
+                quantity: parseFloat(formData.quantity) || 1,
+                price: parseFloat(formData.total_value) || 0,
+                total: parseFloat(formData.total_value) || 0
+              }
+            ],
+            subtotal: parseFloat(formData.total_value) || 0,
+            tax: (parseFloat(formData.total_value) || 0) * 0.05,
+            total: (parseFloat(formData.total_value) || 0) * 1.05,
+            date: new Date().toLocaleDateString(),
+            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A'
+          }}
+          onClose={() => setShowInvoicePrint(false)}
+        />
+      )}
     </div>
   );
 };
@@ -811,6 +867,9 @@ const GRCForm: React.FC = () => {
   const [branches, setBranches] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showInvoicePrint, setShowInvoicePrint] = useState(false);
+  const [savedRecordId, setSavedRecordId] = useState<string>('');
 
   useEffect(() => {
     fetchBranches();
@@ -937,8 +996,7 @@ const GRCForm: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      
+            
       const sanitizedData = {
         ...formData,
         quantity: formData.quantity || 0,
@@ -965,8 +1023,8 @@ const GRCForm: React.FC = () => {
       const response = await saleAnalyticsAPI.createRecord(sanitizedData);
 
       if (response.data.success) {
-        alert('G RC data saved successfully!');
-        window.location.reload();
+        setSavedRecordId(response.data.id || 'GRC-' + Date.now());
+        setShowSuccessModal(true);
       } else {
         alert('Error saving data: ' + (response.data.message || 'Unknown error'));
       }
@@ -1334,6 +1392,39 @@ const GRCForm: React.FC = () => {
           </button>
         </div>
       </form>
+      
+      {/* Success Modal */}
+      <SuccessModal
+        open={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        recordId={savedRecordId}
+        recordType="G RC Record"
+        onPrintInvoice={() => setShowInvoicePrint(true)}
+      />
+      
+      {/* Invoice Print */}
+      {showInvoicePrint && (
+        <InvoicePrint
+          data={{
+            id: savedRecordId,
+            customerName: formData.customer_name || 'N/A',
+            items: [
+              {
+                name: formData.item_code || 'Gold Receive Item',
+                quantity: parseFloat(formData.quantity) || 1,
+                price: parseFloat(formData.total_value) || 0,
+                total: parseFloat(formData.total_value) || 0
+              }
+            ],
+            subtotal: parseFloat(formData.total_value) || 0,
+            tax: (parseFloat(formData.total_value) || 0) * 0.05,
+            total: (parseFloat(formData.total_value) || 0) * 1.05,
+            date: new Date().toLocaleDateString(),
+            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A'
+          }}
+          onClose={() => setShowInvoicePrint(false)}
+        />
+      )}
     </div>
   );
 };
@@ -1378,6 +1469,9 @@ const PTRCForm: React.FC = () => {
   const [branches, setBranches] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showInvoicePrint, setShowInvoicePrint] = useState(false);
+  const [savedRecordId, setSavedRecordId] = useState<string>('');
 
   useEffect(() => {
     fetchBranches();
@@ -1404,8 +1498,7 @@ const PTRCForm: React.FC = () => {
 
   const fetchEmployees = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const userData = localStorage.getItem('user_data');
+            const userData = localStorage.getItem('user_data');
       if (userData) {
         const user = JSON.parse(userData);
         const response = await saleAnalyticsAPI.getEmployees(user.branch_id);
@@ -1481,8 +1574,7 @@ const PTRCForm: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      const sanitizedData = {
+            const sanitizedData = {
         ...formData,
         quantity: formData.quantity || 0,
         gold_weight: formData.gold_weight || 0,
@@ -1507,8 +1599,8 @@ const PTRCForm: React.FC = () => {
       const response = await saleAnalyticsAPI.createRecord(sanitizedData);
 
       if (response.data.success) {
-        alert('PT RC data saved successfully!');
-        window.location.reload();
+        setSavedRecordId(response.data.id || 'PTRC-' + Date.now());
+        setShowSuccessModal(true);
       } else {
         alert('Error saving data: ' + (response.data.message || 'Unknown error'));
       }
@@ -1716,6 +1808,39 @@ const PTRCForm: React.FC = () => {
           </button>
         </div>
       </form>
+      
+      {/* Success Modal */}
+      <SuccessModal
+        open={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        recordId={savedRecordId}
+        recordType="PT RC Record"
+        onPrintInvoice={() => setShowInvoicePrint(true)}
+      />
+      
+      {/* Invoice Print */}
+      {showInvoicePrint && (
+        <InvoicePrint
+          data={{
+            id: savedRecordId,
+            customerName: formData.customer_name || 'N/A',
+            items: [
+              {
+                name: formData.item_code || 'Platinum Receive Item',
+                quantity: parseFloat(formData.quantity) || 1,
+                price: parseFloat(formData.total_gold_value) || 0,
+                total: parseFloat(formData.total_gold_value) || 0
+              }
+            ],
+            subtotal: parseFloat(formData.total_gold_value) || 0,
+            tax: (parseFloat(formData.total_gold_value) || 0) * 0.05,
+            total: (parseFloat(formData.total_gold_value) || 0) * 1.05,
+            date: new Date().toLocaleDateString(),
+            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A'
+          }}
+          onClose={() => setShowInvoicePrint(false)}
+        />
+      )}
     </div>
   );
 };
@@ -1776,6 +1901,9 @@ const DiaSaleForm: React.FC = () => {
   const [branches, setBranches] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showInvoicePrint, setShowInvoicePrint] = useState(false);
+  const [savedRecordId, setSavedRecordId] = useState<string>('');
 
   useEffect(() => {
     fetchBranches();
@@ -1903,8 +2031,7 @@ const DiaSaleForm: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      
+            
       // Sanitize form data - convert empty strings to 0 for numeric fields
       const sanitizedData = {
         ...formData,
@@ -1945,9 +2072,8 @@ const DiaSaleForm: React.FC = () => {
       const result = response.data;
       
       if (result.success) {
-        alert('Sale record created successfully!');
-        // Reset form
-        window.location.reload();
+        setSavedRecordId(result.id || 'DIA-SALE-' + Date.now());
+        setShowSuccessModal(true);
       } else {
         alert(result.message || 'Failed to create sale record');
       }
@@ -2527,6 +2653,39 @@ const DiaSaleForm: React.FC = () => {
           </button>
         </div>
       </form>
+      
+      {/* Success Modal */}
+      <SuccessModal
+        open={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        recordId={savedRecordId}
+        recordType="Dia Sale Record"
+        onPrintInvoice={() => setShowInvoicePrint(true)}
+      />
+      
+      {/* Invoice Print */}
+      {showInvoicePrint && (
+        <InvoicePrint
+          data={{
+            id: savedRecordId,
+            customerName: formData.customer_name || 'N/A',
+            items: [
+              {
+                name: formData.item_code || 'Diamond Sale Item',
+                quantity: parseFloat(formData.quantity) || 1,
+                price: parseFloat(formData.total_value) || 0,
+                total: parseFloat(formData.total_value) || 0
+              }
+            ],
+            subtotal: parseFloat(formData.total_value) || 0,
+            tax: (parseFloat(formData.total_value) || 0) * 0.05,
+            total: (parseFloat(formData.total_value) || 0) * 1.05,
+            date: new Date().toLocaleDateString(),
+            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A'
+          }}
+          onClose={() => setShowInvoicePrint(false)}
+        />
+      )}
     </div>
   );
 };
@@ -2579,6 +2738,9 @@ const GSaleForm: React.FC = () => {
   const [branches, setBranches] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showInvoicePrint, setShowInvoicePrint] = useState(false);
+  const [savedRecordId, setSavedRecordId] = useState<string>('');
 
   useEffect(() => {
     fetchBranches();
@@ -2605,8 +2767,7 @@ const GSaleForm: React.FC = () => {
 
   const fetchEmployees = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const userData = localStorage.getItem('user_data');
+            const userData = localStorage.getItem('user_data');
       if (userData) {
         const user = JSON.parse(userData);
         const response = await saleAnalyticsAPI.getEmployees(user.branch_id);
@@ -2682,8 +2843,7 @@ const GSaleForm: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      const sanitizedData = {
+            const sanitizedData = {
         ...formData,
         quantity: formData.quantity || 0,
         gold_weight: formData.gold_weight || 0,
@@ -2712,8 +2872,8 @@ const GSaleForm: React.FC = () => {
       const response = await saleAnalyticsAPI.createRecord(sanitizedData);
 
       if (response.data.success) {
-        alert('G Sale data saved successfully!');
-        window.location.reload();
+        setSavedRecordId(response.data.id || 'G-SALE-' + Date.now());
+        setShowSuccessModal(true);
       } else {
         alert('Error saving data: ' + (response.data.message || 'Unknown error'));
       }
@@ -2967,6 +3127,39 @@ const GSaleForm: React.FC = () => {
           </button>
         </div>
       </form>
+      
+      {/* Success Modal */}
+      <SuccessModal
+        open={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        recordId={savedRecordId}
+        recordType="G Sale Record"
+        onPrintInvoice={() => setShowInvoicePrint(true)}
+      />
+      
+      {/* Invoice Print */}
+      {showInvoicePrint && (
+        <InvoicePrint
+          data={{
+            id: savedRecordId,
+            customerName: formData.customer_name || 'N/A',
+            items: [
+              {
+                name: formData.item_code || 'Gold Sale Item',
+                quantity: parseFloat(formData.quantity) || 1,
+                price: parseFloat(formData.total_value) || 0,
+                total: parseFloat(formData.total_value) || 0
+              }
+            ],
+            subtotal: parseFloat(formData.total_value) || 0,
+            tax: (parseFloat(formData.total_value) || 0) * 0.05,
+            total: (parseFloat(formData.total_value) || 0) * 1.05,
+            date: new Date().toLocaleDateString(),
+            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A'
+          }}
+          onClose={() => setShowInvoicePrint(false)}
+        />
+      )}
     </div>
   );
 };
@@ -3021,6 +3214,9 @@ const PTSaleForm: React.FC = () => {
   const [branches, setBranches] = useState<any[]>([]);
   const [employees, setEmployees] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showInvoicePrint, setShowInvoicePrint] = useState(false);
+  const [savedRecordId, setSavedRecordId] = useState<string>('');
 
   useEffect(() => {
     fetchBranches();
@@ -3047,8 +3243,7 @@ const PTSaleForm: React.FC = () => {
 
   const fetchEmployees = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
-      const userData = localStorage.getItem('user_data');
+            const userData = localStorage.getItem('user_data');
       if (userData) {
         const user = JSON.parse(userData);
         const response = await saleAnalyticsAPI.getEmployees(user.branch_id);
@@ -3124,8 +3319,7 @@ const PTSaleForm: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     try {
-      const token = localStorage.getItem('auth_token');
-      const sanitizedData = {
+            const sanitizedData = {
         ...formData,
         quantity: formData.quantity || 0,
         gold_weight: formData.gold_weight || 0,
@@ -3156,8 +3350,8 @@ const PTSaleForm: React.FC = () => {
       const response = await saleAnalyticsAPI.createRecord(sanitizedData);
 
       if (response.data.success) {
-        alert('PT Sale data saved successfully!');
-        window.location.reload();
+        setSavedRecordId(response.data.id || 'PT-SALE-' + Date.now());
+        setShowSuccessModal(true);
       } else {
         alert('Error saving data: ' + (response.data.message || 'Unknown error'));
       }
@@ -3421,6 +3615,39 @@ const PTSaleForm: React.FC = () => {
           </button>
         </div>
       </form>
+      
+      {/* Success Modal */}
+      <SuccessModal
+        open={showSuccessModal}
+        onClose={() => setShowSuccessModal(false)}
+        recordId={savedRecordId}
+        recordType="PT Sale Record"
+        onPrintInvoice={() => setShowInvoicePrint(true)}
+      />
+      
+      {/* Invoice Print */}
+      {showInvoicePrint && (
+        <InvoicePrint
+          data={{
+            id: savedRecordId,
+            customerName: formData.customer_name || 'N/A',
+            items: [
+              {
+                name: formData.item_code || 'Platinum Sale Item',
+                quantity: parseFloat(formData.quantity) || 1,
+                price: parseFloat(formData.total_value) || 0,
+                total: parseFloat(formData.total_value) || 0
+              }
+            ],
+            subtotal: parseFloat(formData.total_value) || 0,
+            tax: (parseFloat(formData.total_value) || 0) * 0.05,
+            total: (parseFloat(formData.total_value) || 0) * 1.05,
+            date: new Date().toLocaleDateString(),
+            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A'
+          }}
+          onClose={() => setShowInvoicePrint(false)}
+        />
+      )}
     </div>
   );
 };
