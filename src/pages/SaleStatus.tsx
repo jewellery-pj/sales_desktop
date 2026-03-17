@@ -134,6 +134,7 @@ const DiaRCForm: React.FC = () => {
     address: '',
     transcation_type: '',
     employee_id: '',
+    employee_name: '',
     remark: '',
     sale_status_id: '1', // Dia RC tab ID
     w_gram: '',
@@ -147,6 +148,8 @@ const DiaRCForm: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showInvoicePrint, setShowInvoicePrint] = useState(false);
   const [savedRecordId, setSavedRecordId] = useState('');
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   
   useEffect(() => {
     fetchBranches();
@@ -225,6 +228,22 @@ const DiaRCForm: React.FC = () => {
         w_gram: '0',
       });
     }
+  };
+
+  // Filter employees based on search term
+  const filteredEmployees = employees.filter(employee =>
+    employee.name && employee.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+  );
+
+  // Handle employee selection
+  const handleEmployeeSelect = (employee: any) => {
+    setFormData({
+      ...formData,
+      employee_id: employee.id.toString(),
+      employee_name: employee.name
+    });
+    setShowEmployeeDropdown(false);
+    setEmployeeSearchTerm('');
   };
 
   const handleLossGramChange = (value: string) => {
@@ -707,15 +726,39 @@ const DiaRCForm: React.FC = () => {
 
           <div className="form-group">
             <label>Sale Name (Employee)</label>
-            <select
-              value={formData.employee_id}
-              onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-            >
-              <option value="">Select Employee</option>
-              {employees.map(emp => (
-                <option key={emp.id} value={emp.id}>{emp.name}</option>
-              ))}
-            </select>
+            <div className="searchable-dropdown">
+              <input
+                type="text"
+                placeholder="Search employee..."
+                value={employeeSearchTerm || formData.employee_name || ''}
+                onChange={(e) => {
+                  setEmployeeSearchTerm(e.target.value);
+                  setShowEmployeeDropdown(true);
+                }}
+                onFocus={() => setShowEmployeeDropdown(true)}
+                onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                className="employee-search-input"
+              />
+              {showEmployeeDropdown && (
+                <div className="employee-dropdown-list">
+                  {filteredEmployees.length > 0 ? (
+                    filteredEmployees.map((employee) => (
+                      <div
+                        key={employee.id}
+                        className="employee-option"
+                        onMouseDown={() => handleEmployeeSelect(employee)}
+                      >
+                        {employee.name}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="employee-option no-results">
+                      No employees found
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="form-group">
@@ -817,7 +860,11 @@ const DiaRCForm: React.FC = () => {
             tax: (parseFloat(formData.total_value) || 0) * 0.05,
             total: (parseFloat(formData.total_value) || 0) * 1.05,
             date: new Date().toLocaleDateString(),
-            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A'
+            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A',
+            recordType: 'Dia RC Record',
+            branchName: branches.find(b => b.id === formData.branch_id)?.name || 'N/A',
+            customerPhone: formData.phone_no || undefined,
+            customerAddress: formData.address || undefined
           }}
           onClose={() => setShowInvoicePrint(false)}
         />
@@ -860,6 +907,7 @@ const GRCForm: React.FC = () => {
     address: '',
     transcation_type: '',
     employee_id: '',
+    employee_name: '',
     remark: '',
     sale_status_id: '2', // G RC tab ID
   });
@@ -870,6 +918,8 @@ const GRCForm: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showInvoicePrint, setShowInvoicePrint] = useState(false);
   const [savedRecordId, setSavedRecordId] = useState<string>('');
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
 
   useEffect(() => {
     fetchBranches();
@@ -946,6 +996,22 @@ const GRCForm: React.FC = () => {
         loss_gram: '0',
       });
     }
+  };
+
+  // Filter employees based on search term
+  const filteredEmployees = employees.filter(employee =>
+    employee.name && employee.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+  );
+
+  // Handle employee selection
+  const handleEmployeeSelect = (employee: any) => {
+    setFormData({
+      ...formData,
+      employee_id: employee.id.toString(),
+      employee_name: employee.name
+    });
+    setShowEmployeeDropdown(false);
+    setEmployeeSearchTerm('');
   };
 
   const handleGoldWeightChange = (value: string) => {
@@ -1363,17 +1429,39 @@ const GRCForm: React.FC = () => {
 
           <div className="form-group">
             <label>Sale Name (Employee)</label>
-            <select
-              value={formData.employee_id}
-              onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-            >
-              <option value="">Select Employee</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.name}
-                </option>
-              ))}
-            </select>
+            <div className="searchable-dropdown">
+              <input
+                type="text"
+                placeholder="Search employee..."
+                value={employeeSearchTerm || formData.employee_name || ''}
+                onChange={(e) => {
+                  setEmployeeSearchTerm(e.target.value);
+                  setShowEmployeeDropdown(true);
+                }}
+                onFocus={() => setShowEmployeeDropdown(true)}
+                onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                className="employee-search-input"
+              />
+              {showEmployeeDropdown && (
+                <div className="employee-dropdown-list">
+                  {filteredEmployees.length > 0 ? (
+                    filteredEmployees.map((employee) => (
+                      <div
+                        key={employee.id}
+                        className="employee-option"
+                        onMouseDown={() => handleEmployeeSelect(employee)}
+                      >
+                        {employee.name}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="employee-option no-results">
+                      No employees found
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="form-group">
@@ -1420,7 +1508,11 @@ const GRCForm: React.FC = () => {
             tax: (parseFloat(formData.total_value) || 0) * 0.05,
             total: (parseFloat(formData.total_value) || 0) * 1.05,
             date: new Date().toLocaleDateString(),
-            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A'
+            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A',
+            recordType: 'G RC Record',
+            branchName: branches.find(b => b.id === formData.branch_id)?.name || 'N/A',
+            customerPhone: formData.phone_no || undefined,
+            customerAddress: formData.address || undefined
           }}
           onClose={() => setShowInvoicePrint(false)}
         />
@@ -1462,6 +1554,7 @@ const PTRCForm: React.FC = () => {
     address: '',
     transcation_type: '',
     employee_id: '',
+    employee_name: '',
     remark: '',
     sale_status_id: '3', // PT RC tab ID
   });
@@ -1472,6 +1565,8 @@ const PTRCForm: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showInvoicePrint, setShowInvoicePrint] = useState(false);
   const [savedRecordId, setSavedRecordId] = useState<string>('');
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
 
   useEffect(() => {
     fetchBranches();
@@ -1536,6 +1631,22 @@ const PTRCForm: React.FC = () => {
     } else {
       setFormData({ ...newFormData, loss_gram: '0' });
     }
+  };
+
+  // Filter employees based on search term
+  const filteredEmployees = employees.filter(employee =>
+    employee.name && employee.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+  );
+
+  // Handle employee selection
+  const handleEmployeeSelect = (employee: any) => {
+    setFormData({
+      ...formData,
+      employee_id: employee.id.toString(),
+      employee_name: employee.name
+    });
+    setShowEmployeeDropdown(false);
+    setEmployeeSearchTerm('');
   };
 
   const handleGoldWeightChange = (value: string) => {
@@ -1787,18 +1898,49 @@ const PTRCForm: React.FC = () => {
           </div>
 
           <div className="form-group">
-            <label>Sale Name</label>
-            <select value={formData.employee_id} onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}>
-              <option value="">Select Employee</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>{emp.name}</option>
-              ))}
-            </select>
+            <label>Sale Name (Employee)</label>
+            <div className="searchable-dropdown">
+              <input
+                type="text"
+                placeholder="Search employee..."
+                value={employeeSearchTerm || formData.employee_name || ''}
+                onChange={(e) => {
+                  setEmployeeSearchTerm(e.target.value);
+                  setShowEmployeeDropdown(true);
+                }}
+                onFocus={() => setShowEmployeeDropdown(true)}
+                onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                className="employee-search-input"
+              />
+              {showEmployeeDropdown && (
+                <div className="employee-dropdown-list">
+                  {filteredEmployees.length > 0 ? (
+                    filteredEmployees.map((employee) => (
+                      <div
+                        key={employee.id}
+                        className="employee-option"
+                        onMouseDown={() => handleEmployeeSelect(employee)}
+                      >
+                        {employee.name}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="employee-option no-results">
+                      No employees found
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="form-group">
             <label>မှတ်ချက် (Remark)</label>
-            <textarea value={formData.remark} onChange={(e) => setFormData({ ...formData, remark: e.target.value })} rows={3} />
+            <textarea
+              value={formData.remark}
+              onChange={(e) => setFormData({ ...formData, remark: e.target.value })}
+              rows={3}
+            />
           </div>
         </div>
 
@@ -1828,15 +1970,19 @@ const PTRCForm: React.FC = () => {
               {
                 name: formData.item_code || 'Platinum Receive Item',
                 quantity: parseFloat(formData.quantity) || 1,
-                price: parseFloat(formData.total_gold_value) || 0,
-                total: parseFloat(formData.total_gold_value) || 0
+                price: parseFloat(formData.total_value) || 0,
+                total: parseFloat(formData.total_value) || 0
               }
             ],
-            subtotal: parseFloat(formData.total_gold_value) || 0,
-            tax: (parseFloat(formData.total_gold_value) || 0) * 0.05,
-            total: (parseFloat(formData.total_gold_value) || 0) * 1.05,
+            subtotal: parseFloat(formData.total_value) || 0,
+            tax: (parseFloat(formData.total_value) || 0) * 0.05,
+            total: (parseFloat(formData.total_value) || 0) * 1.05,
             date: new Date().toLocaleDateString(),
-            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A'
+            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A',
+            recordType: 'PT RC Record',
+            branchName: branches.find(b => b.id === formData.branch_id)?.name || 'N/A',
+            customerPhone: formData.phone_no || undefined,
+            customerAddress: formData.address || undefined
           }}
           onClose={() => setShowInvoicePrint(false)}
         />
@@ -1887,6 +2033,7 @@ const DiaSaleForm: React.FC = () => {
     transcation_type: '',
     prefix: '',
     employee_id: '',
+    employee_name: '',
     on_off: 'online',
     change: '',
     return: '',
@@ -1904,6 +2051,8 @@ const DiaSaleForm: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showInvoicePrint, setShowInvoicePrint] = useState(false);
   const [savedRecordId, setSavedRecordId] = useState<string>('');
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
 
   useEffect(() => {
     fetchBranches();
@@ -1963,6 +2112,22 @@ const DiaSaleForm: React.FC = () => {
         y: '0',
       });
     }
+  };
+
+  // Filter employees based on search term
+  const filteredEmployees = employees.filter(employee =>
+    employee.name && employee.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+  );
+
+  // Handle employee selection
+  const handleEmployeeSelect = (employee: any) => {
+    setFormData({
+      ...formData,
+      employee_id: employee.id.toString(),
+      employee_name: employee.name
+    });
+    setShowEmployeeDropdown(false);
+    setEmployeeSearchTerm('');
   };
 
   const handleLossGramChange = (value: string) => {
@@ -2542,17 +2707,39 @@ const DiaSaleForm: React.FC = () => {
           {/* Employee (Sale Name) */}
           <div className="form-group">
             <label>Sale Name</label>
-            <select
-              value={formData.employee_id}
-              onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}
-            >
-              <option value="">Select Employee</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>
-                  {emp.name}
-                </option>
-              ))}
-            </select>
+            <div className="searchable-dropdown">
+              <input
+                type="text"
+                placeholder="Search employee..."
+                value={employeeSearchTerm || formData.employee_name || ''}
+                onChange={(e) => {
+                  setEmployeeSearchTerm(e.target.value);
+                  setShowEmployeeDropdown(true);
+                }}
+                onFocus={() => setShowEmployeeDropdown(true)}
+                onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                className="employee-search-input"
+              />
+              {showEmployeeDropdown && (
+                <div className="employee-dropdown-list">
+                  {filteredEmployees.length > 0 ? (
+                    filteredEmployees.map((employee) => (
+                      <div
+                        key={employee.id}
+                        className="employee-option"
+                        onMouseDown={() => handleEmployeeSelect(employee)}
+                      >
+                        {employee.name}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="employee-option no-results">
+                      No employees found
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* On/Off */}
@@ -2681,7 +2868,11 @@ const DiaSaleForm: React.FC = () => {
             tax: (parseFloat(formData.total_value) || 0) * 0.05,
             total: (parseFloat(formData.total_value) || 0) * 1.05,
             date: new Date().toLocaleDateString(),
-            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A'
+            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A',
+            recordType: 'Dia Sale Record',
+            branchName: branches.find(b => b.id === formData.branch_id)?.name || 'N/A',
+            customerPhone: formData.phone_no || undefined,
+            customerAddress: formData.address || undefined
           }}
           onClose={() => setShowInvoicePrint(false)}
         />
@@ -2729,6 +2920,7 @@ const GSaleForm: React.FC = () => {
     transcation_type: '',
     prefix: '',
     employee_id: '',
+    employee_name: '',
     on_off: 'online',
     gs_date: '',
     remark: '',
@@ -2741,11 +2933,30 @@ const GSaleForm: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showInvoicePrint, setShowInvoicePrint] = useState(false);
   const [savedRecordId, setSavedRecordId] = useState<string>('');
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
 
   useEffect(() => {
     fetchBranches();
     fetchEmployees();
   }, []);
+
+  // Filter employees based on search term
+  const filteredEmployees = employees.filter(employee =>
+    employee.name && employee.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+  );
+
+  // Handle employee selection
+  const handleEmployeeSelect = (employee: any) => {
+    setFormData({
+      ...formData,
+      employee_id: employee.id.toString(),
+      employee_name: employee.name
+    });
+    setShowEmployeeDropdown(false);
+    setEmployeeSearchTerm('');
+  };
+
 
   const fetchBranches = async () => {
     try {
@@ -2838,6 +3049,8 @@ const GSaleForm: React.FC = () => {
       setFormData({ ...newFormData, loss_gram: '0' });
     }
   };
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -3094,12 +3307,39 @@ const GSaleForm: React.FC = () => {
 
           <div className="form-group">
             <label>Sale Name (Employee)</label>
-            <select value={formData.employee_id} onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}>
-              <option value="">Select Employee</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>{emp.name}</option>
-              ))}
-            </select>
+            <div className="searchable-dropdown">
+              <input
+                type="text"
+                placeholder="Search employee..."
+                value={employeeSearchTerm || formData.employee_name || ''}
+                onChange={(e) => {
+                  setEmployeeSearchTerm(e.target.value);
+                  setShowEmployeeDropdown(true);
+                }}
+                onFocus={() => setShowEmployeeDropdown(true)}
+                onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                className="employee-search-input"
+              />
+              {showEmployeeDropdown && (
+                <div className="employee-dropdown-list">
+                  {filteredEmployees.length > 0 ? (
+                    filteredEmployees.map((employee) => (
+                      <div
+                        key={employee.id}
+                        className="employee-option"
+                        onMouseDown={() => handleEmployeeSelect(employee)}
+                      >
+                        {employee.name}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="employee-option no-results">
+                      No employees found
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="form-group">
@@ -3155,7 +3395,11 @@ const GSaleForm: React.FC = () => {
             tax: (parseFloat(formData.total_value) || 0) * 0.05,
             total: (parseFloat(formData.total_value) || 0) * 1.05,
             date: new Date().toLocaleDateString(),
-            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A'
+            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A',
+            recordType: 'G Sale Record',
+            branchName: branches.find(b => b.id === formData.branch_id)?.name || 'N/A',
+            customerPhone: formData.phone_no || undefined,
+            customerAddress: formData.address || undefined
           }}
           onClose={() => setShowInvoicePrint(false)}
         />
@@ -3203,10 +3447,13 @@ const PTSaleForm: React.FC = () => {
     transcation_type: '',
     prefix: '',
     employee_id: '',
+    employee_name: '',
     on_off: 'online',
     change: '',
     return: '',
     gs_date: '',
+    dia_and_gem: 'diamond',
+    real_to_payment_amount: '',
     remark: '',
     sale_status_id: '6', // PT Sale tab ID
   });
@@ -3217,11 +3464,29 @@ const PTSaleForm: React.FC = () => {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showInvoicePrint, setShowInvoicePrint] = useState(false);
   const [savedRecordId, setSavedRecordId] = useState<string>('');
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
 
   useEffect(() => {
     fetchBranches();
     fetchEmployees();
   }, []);
+
+  // Filter employees based on search term
+  const filteredEmployees = employees.filter(employee =>
+    employee.name && employee.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+  );
+
+  // Handle employee selection
+  const handleEmployeeSelect = (employee: any) => {
+    setFormData({
+      ...formData,
+      employee_id: employee.id.toString(),
+      employee_name: employee.name
+    });
+    setShowEmployeeDropdown(false);
+    setEmployeeSearchTerm('');
+  };
 
   const fetchBranches = async () => {
     try {
@@ -3572,12 +3837,39 @@ const PTSaleForm: React.FC = () => {
 
           <div className="form-group">
             <label>Sale Name (Employee)</label>
-            <select value={formData.employee_id} onChange={(e) => setFormData({ ...formData, employee_id: e.target.value })}>
-              <option value="">Select Employee</option>
-              {employees.map((emp) => (
-                <option key={emp.id} value={emp.id}>{emp.name}</option>
-              ))}
-            </select>
+            <div className="searchable-dropdown">
+              <input
+                type="text"
+                placeholder="Search employee..."
+                value={employeeSearchTerm || formData.employee_name || ''}
+                onChange={(e) => {
+                  setEmployeeSearchTerm(e.target.value);
+                  setShowEmployeeDropdown(true);
+                }}
+                onFocus={() => setShowEmployeeDropdown(true)}
+                onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                className="employee-search-input"
+              />
+              {showEmployeeDropdown && (
+                <div className="employee-dropdown-list">
+                  {filteredEmployees.length > 0 ? (
+                    filteredEmployees.map((employee) => (
+                      <div
+                        key={employee.id}
+                        className="employee-option"
+                        onMouseDown={() => handleEmployeeSelect(employee)}
+                      >
+                        {employee.name}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="employee-option no-results">
+                      No employees found
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
 
           <div className="form-group">
@@ -3643,7 +3935,11 @@ const PTSaleForm: React.FC = () => {
             tax: (parseFloat(formData.total_value) || 0) * 0.05,
             total: (parseFloat(formData.total_value) || 0) * 1.05,
             date: new Date().toLocaleDateString(),
-            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A'
+            staffName: localStorage.getItem('user_data') ? JSON.parse(localStorage.getItem('user_data') || '{}').name : 'N/A',
+            recordType: 'PT Sale Record',
+            branchName: branches.find(b => b.id === formData.branch_id)?.name || 'N/A',
+            customerPhone: formData.phone_no || undefined,
+            customerAddress: formData.address || undefined
           }}
           onClose={() => setShowInvoicePrint(false)}
         />

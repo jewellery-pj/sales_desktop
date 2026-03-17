@@ -23,6 +23,50 @@
   margin-bottom: 24px;
 }
 
+.filter-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.filter-header h3 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.1rem;
+}
+
+.filter-indicators {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.filter-indicator, .cashier-indicator {
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 0.85rem;
+  font-weight: 500;
+}
+
+.filter-indicator {
+  background-color: var(--accent-color);
+  color: white;
+  animation: pulse 2s infinite;
+}
+
+.cashier-indicator {
+  background-color: #4caf50;
+  color: white;
+  border: 1px solid #45a049;
+}
+
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.7; }
+  100% { opacity: 1; }
+}
+
 .filter-row {
   display: grid;
   grid-template-columns: 1.5fr 1fr 1fr 1fr 1fr auto auto;
@@ -296,6 +340,7 @@
 }
 
 .modal-overlay {
+  
   position: fixed;
   top: 0;
   left: 0;
@@ -306,13 +351,15 @@
   align-items: center;
   justify-content: center;
   z-index: 1000;
+  max-width: 100%;
+
 }
 
 .modal-content {
   background-color: var(--bg-primary);
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
-  max-width: 800px;
+  max-width: 1000px;
   width: 90%;
   max-height: 90vh;
   overflow: hidden;
@@ -514,4 +561,65 @@
   text-align: center;
   padding: 40px;
   color: var(--text-secondary);
+}
+
+/* Searchable Employee Dropdown */
+.searchable-dropdown {
+  position: relative;
+}
+
+.employee-search-input {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 0.95rem;
+  transition: border-color 0.2s;
+}
+
+.employee-search-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+}
+
+.employee-dropdown-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  max-height: 200px;
+  overflow-y: auto;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  margin-top: 4px;
+}
+
+.employee-option {
+  padding: 10px 12px;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border-color);
+  transition: background-color 0.2s;
+}
+
+.employee-option:hover {
+  background-color: var(--bg-secondary);
+}
+
+.employee-option:last-child {
+  border-bottom: none;
+}
+
+.employee-option.no-results {
+  color: var(--text-secondary);
+  cursor: default;
+  font-style: italic;
+}
+
+.employee-option.no-results:hover {
+  background-color: transparent;
 }

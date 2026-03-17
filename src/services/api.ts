@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL =  'http://192.168.100.171:8000/api';
-// const API_BASE_URL =  'https://kpi.29jewellery.com/api';
+// const API_BASE_URL =  'http://127.0.0.1:8000/api';
+const API_BASE_URL =  'https://kpi.29jewellery.com/api';
 
 const api = axios.create({
   baseURL: API_BASE_URL,

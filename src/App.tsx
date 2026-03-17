@@ -31,6 +31,9 @@ const App: React.FC = () => {
       </button>
       <nav className={`sidebar ${sidebarOpen ? 'open' : 'closed'}`}>
         <div className="sidebar-header">
+          <div className="logo-container">
+            <img src="/logoa.png" alt="29 Jewellery" className="logo" />
+          </div>
           <h1>29 Jewellery</h1>
           <p className="user-name">{user?.name}</p>
           <p className="user-role">{user?.position?.name || user?.role?.display_name || 'Employee'}</p>

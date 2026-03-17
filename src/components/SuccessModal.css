@@ -14,8 +14,8 @@
 .modal-content {
   background: white;
   border-radius: 12px;
-  padding: 32px;
-  max-width: 400px;
+  padding: 50px;
+  max-width: 800px;
   width: 90%;
   text-align: center;
   border: 2px solid #4CAF50;
@@ -23,20 +23,20 @@
 }
 
 .success-icon {
-  margin-bottom: 16px;
+  margin-bottom: 30px;
 }
 
 .modal-title {
-  margin: 0 0 16px 0;
+  margin: 0 0 24px 0;
   color: #2E7D32;
-  font-size: 24px;
+  font-size: 32px;
   font-weight: 600;
 }
 
 .modal-message {
-  margin: 0 0 24px 0;
+  margin: 0 0 40px 0;
   color: #666;
-  font-size: 16px;
+  font-size: 20px;
   line-height: 1.5;
 }
 
@@ -54,17 +54,17 @@
 }
 
 .btn {
-  padding: 12px 24px;
+  padding: 20px 40px;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 18px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  min-width: 120px;
+  min-width: 160px;
 }
 
 .btn-outline {

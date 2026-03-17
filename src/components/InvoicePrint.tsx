@@ -15,6 +15,10 @@ interface InvoiceData {
   total: number;
   date: string;
   staffName: string;
+  recordType?: string;
+  branchName?: string;
+  customerPhone?: string;
+  customerAddress?: string;
 }
 
 interface InvoicePrintProps {
@@ -216,6 +220,8 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({ data, onClose }) => {
             <h2>INVOICE</h2>
             <p class="invoice-number">Invoice #: ${data.id}</p>
             <p>Date: ${data.date}</p>
+            ${data.recordType ? `<p>Type: ${data.recordType}</p>` : ''}
+            ${data.branchName ? `<p>Branch: ${data.branchName}</p>` : ''}
           </div>
         </div>
 
@@ -223,8 +229,8 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({ data, onClose }) => {
           <div class="customer-info">
             <h3>Bill To:</h3>
             <p class="customer-name">${data.customerName}</p>
-            <p>Address: Customer Address</p>
-            <p>Phone: Customer Phone</p>
+            <p>Address: ${data.customerAddress || 'Customer Address'}</p>
+            <p>Phone: ${data.customerPhone || 'Customer Phone'}</p>
           </div>
           <div class="date-info">
             <p><strong>Sales Person:</strong> ${data.staffName}</p>
@@ -294,8 +300,29 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({ data, onClose }) => {
     
     // Wait for content to load, then print
     printWindow.onload = () => {
-      printWindow.print();
-      printWindow.close();
+      // Ask user how many copies to print
+      const copies = prompt('How many copies would you like to print?', '1');
+      const numCopies = parseInt(copies || '1') || 1;
+      
+      if (numCopies > 0) {
+        printWindow.print();
+        printWindow.close();
+        
+        // Print additional copies if needed
+        for (let i = 1; i < numCopies; i++) {
+          setTimeout(() => {
+            const additionalPrintWindow = window.open('', '_blank');
+            if (additionalPrintWindow) {
+              additionalPrintWindow.document.write(printContent);
+              additionalPrintWindow.document.close();
+              additionalPrintWindow.onload = () => {
+                additionalPrintWindow.print();
+                additionalPrintWindow.close();
+              };
+            }
+          }, i * 1000);
+        }
+      }
     };
   };
 
@@ -313,6 +340,8 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({ data, onClose }) => {
             <h2>INVOICE</h2>
             <p className="invoice-number">Invoice #: {data.id}</p>
             <p>Date: {data.date}</p>
+            {data.recordType && <p>Type: {data.recordType}</p>}
+            {data.branchName && <p>Branch: {data.branchName}</p>}
           </div>
         </div>
 
@@ -321,8 +350,8 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({ data, onClose }) => {
           <div className="customer-info">
             <h3>Bill To:</h3>
             <p className="customer-name">{data.customerName}</p>
-            <p>Address: Customer Address</p>
-            <p>Phone: Customer Phone</p>
+            <p>Address: {data.customerAddress || 'Customer Address'}</p>
+            <p>Phone: {data.customerPhone || 'Customer Phone'}</p>
           </div>
           <div className="date-info">
             <p><strong>Sales Person:</strong> {data.staffName}</p>
@@ -393,6 +422,9 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({ data, onClose }) => {
 
       {/* Print Actions (Hidden when printing) */}
       <div className="print-actions">
+        <button className="btn btn-secondary" onClick={onClose}>
+          ✏️ Edit
+        </button>
         <button className="btn btn-primary" onClick={handlePrint}>
           🖨️ Print Invoice
         </button>

@@ -58,6 +58,7 @@ interface Sale {
   dia_and_gem?: 'diamond' | 'gem';
   status?: 'new' | 'return';
   charges_and_other?: number;
+  cashier_id?: number;
 }
 
 const Sales: React.FC = () => {
@@ -77,6 +78,9 @@ const Sales: React.FC = () => {
   const [selectedSale, setSelectedSale] = useState<Sale | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [employeeSearchTerm, setEmployeeSearchTerm] = useState('');
+  const [showEmployeeDropdown, setShowEmployeeDropdown] = useState(false);
   
   useEffect(() => {
     fetchSales();
@@ -144,17 +148,33 @@ const Sales: React.FC = () => {
     try {
       setLoading(true);
       
+      // Get logged-in user data from localStorage
+      const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+      const loggedInUserId = userData.id || userData.staff_id || userData.employee_id;
+      
       const filterParams: any = {};
       if (filters.sale_status_id) filterParams.sale_status_id = parseInt(filters.sale_status_id);
       if (filters.date_from) filterParams.date_from = filters.date_from;
       if (filters.date_to) filterParams.date_to = filters.date_to;
       if (filters.item_code) filterParams.item_code = filters.item_code;
       if (filters.invoice_number) filterParams.invoice_number = filters.invoice_number;
+      if (loggedInUserId) filterParams.cashier_id = loggedInUserId;
+      
+      console.log('Fetching sales with filters:', filterParams);
+      console.log('Logged-in user ID:', loggedInUserId);
       
       const response = await saleAnalyticsAPI.getRecords(filterParams);
       const result = response.data;
       if (result.success) {
-        setSales(result.data.data || []);
+        const allSales = result.data.data || [];
+        
+        // Additional client-side filtering if needed (as backup)
+        const filteredSales = loggedInUserId 
+          ? allSales.filter((sale: Sale) => sale.cashier_id === loggedInUserId)
+          : allSales;
+          
+        setSales(filteredSales);
+        console.log(`Filtered ${filteredSales.length} records for cashier_id: ${loggedInUserId}`);
       }
     } catch (error) {
       console.error('Error fetching sales:', error);
@@ -164,7 +184,7 @@ const Sales: React.FC = () => {
   };
 
   const handleSearch = () => {
-    fetchSales();
+    fetchSalesWithFilters();
   };
 
   
@@ -247,8 +267,398 @@ const Sales: React.FC = () => {
     setIsEditMode(false);
   };
 
+  const handlePrint = (sale: Sale) => {
+    console.log('Print button clicked for sale:', sale);
+    
+    // Create print data from sale record
+    const printData = {
+      id: sale.id.toString(),
+      customerName: sale.customer_name || 'N/A',
+      items: [
+        {
+          name: sale.item_code || 'Item',
+          quantity: sale.quantity || 1,
+          price: parseFloat(String(sale.total_value)) || 0,
+          total: parseFloat(String(sale.total_value)) || 0
+        }
+      ],
+      subtotal: parseFloat(String(sale.total_value)) || 0,
+      tax: (parseFloat(String(sale.total_value)) || 0) * 0.05,
+      total: (parseFloat(String(sale.total_value)) || 0) * 1.05,
+      date: sale.date ? new Date(sale.date).toLocaleDateString() : new Date().toLocaleDateString(),
+      staffName: sale.employee_name || 'N/A',
+      recordType: sale.sale_status_name || 'Sale Record',
+      branchName: sale.branch_name || 'N/A',
+      customerPhone: sale.phone_no || undefined,
+      customerAddress: sale.address || undefined
+    };
+
+    // Create a new window for printing
+    console.log('Creating print window...');
+    const printWindow = window.open('', '_blank');
+    
+    if (!printWindow) {
+      console.error('Failed to open print window');
+      alert('Please allow popups to print the invoice');
+      return;
+    }
+    
+    console.log('Print window created successfully');
+    
+    // Generate HTML content for printing
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Invoice_${printData.id}</title>
+        <style>
+          * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+          }
+          
+          body {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            line-height: 1.2;
+            background: white;
+            padding: 15px;
+          }
+          
+          .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #333;
+          }
+          
+          .company-info h1 {
+            font-size: 18px;
+            margin-bottom: 3px;
+          }
+          
+          .company-info p {
+            font-size: 8px;
+            margin: 1px 0;
+          }
+          
+          .invoice-title h2 {
+            font-size: 20px;
+            margin-bottom: 3px;
+          }
+          
+          .invoice-number {
+            font-size: 12px;
+          }
+          
+          .invoice-info-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 10px;
+          }
+          
+          .customer-info h3 {
+            font-size: 12px;
+            margin-bottom: 3px;
+          }
+          
+          .customer-name {
+            font-size: 10px;
+          }
+          
+          .customer-info p,
+          .date-info p {
+            font-size: 9px;
+            margin: 1px 0;
+          }
+          
+          .items-section {
+            margin-bottom: 10px;
+          }
+          
+          .invoice-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 9px;
+          }
+          
+          .invoice-table th,
+          .invoice-table td {
+            border: 1px solid #ddd;
+            padding: 4px;
+            text-align: left;
+          }
+          
+          .invoice-table th {
+            background-color: #f5f5f5;
+            font-weight: bold;
+          }
+          
+          .item-no {
+            width: 30px;
+            text-align: center;
+          }
+          
+          .item-desc {
+            width: 120px;
+          }
+          
+          .item-qty {
+            width: 40px;
+            text-align: center;
+          }
+          
+          .item-price {
+            width: 60px;
+            text-align: right;
+          }
+          
+          .item-total {
+            width: 60px;
+            text-align: right;
+          }
+          
+          .totals-section {
+            margin-bottom: 10px;
+          }
+          
+          .totals-container {
+            width: 180px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            margin-left: auto;
+          }
+          
+          .total-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 9px;
+            margin-bottom: 3px;
+          }
+          
+          .grand-total {
+            font-size: 12px;
+            font-weight: bold;
+            border-top: 2px solid #333;
+            padding-top: 3px;
+            margin-top: 3px;
+          }
+          
+          .invoice-footer {
+            margin-top: 10px;
+            border-top: 1px solid #ddd;
+            padding-top: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+          }
+          
+          .payment-info p {
+            font-size: 8px;
+            margin: 1px 0;
+          }
+          
+          .signature-box {
+            width: 120px;
+            text-align: center;
+          }
+          
+          .signature-box p {
+            font-size: 8px;
+            margin: 1px 0;
+          }
+          
+          .signature-box p:first-child {
+            margin-bottom: 3px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 5px;
+          }
+          
+          @page {
+            margin: 8mm;
+            size: A4;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="invoice-header">
+          <div class="company-info">
+            <h1>29 JEWELLERY</h1>
+            <p>No. (123), Street Name, Township</p>
+            <p>Yangon, Myanmar | Phone: +95 9 123 456 789</p>
+          </div>
+          <div class="invoice-title">
+            <h2>INVOICE</h2>
+            <p class="invoice-number">Invoice #: ${printData.id}</p>
+            <p>Date: ${printData.date}</p>
+            ${printData.recordType ? `<p>Type: ${printData.recordType}</p>` : ''}
+            ${printData.branchName ? `<p>Branch: ${printData.branchName}</p>` : ''}
+          </div>
+        </div>
+
+        <div class="invoice-info-section">
+          <div class="customer-info">
+            <h3>Bill To:</h3>
+            <p class="customer-name">${printData.customerName}</p>
+            <p>Address: ${printData.customerAddress || 'Customer Address'}</p>
+            <p>Phone: ${printData.customerPhone || 'Customer Phone'}</p>
+          </div>
+          <div class="date-info">
+            <p><strong>Sales Person:</strong> ${printData.staffName}</p>
+            <p><strong>Payment:</strong> Cash</p>
+          </div>
+        </div>
+
+        <div class="items-section">
+          <table class="invoice-table">
+            <thead>
+              <tr>
+                <th class="item-no">No.</th>
+                <th class="item-desc">Description</th>
+                <th class="item-qty">Qty</th>
+                <th class="item-price">Unit Price</th>
+                <th class="item-total">Amount</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${printData.items.map((item, index) => `
+                <tr>
+                  <td class="item-no">${index + 1}</td>
+                  <td class="item-desc">${item.name}</td>
+                  <td class="item-qty">${item.quantity}</td>
+                  <td class="item-price">$${(parseFloat(String(item.price)) || 0).toFixed(2)}</td>
+                  <td class="item-total">$${(parseFloat(String(item.total)) || 0).toFixed(2)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="totals-section">
+          <div class="totals-container">
+            <div class="total-row">
+              <span>Subtotal:</span>
+              <span>$${(parseFloat(String(printData.subtotal)) || 0).toFixed(2)}</span>
+            </div>
+            <div class="total-row">
+              <span>Tax (5%):</span>
+              <span>$${(parseFloat(String(printData.tax)) || 0).toFixed(2)}</span>
+            </div>
+            <div class="total-row grand-total">
+              <strong>TOTAL:</strong>
+              <strong>$${(parseFloat(String(printData.total)) || 0).toFixed(2)}</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="invoice-footer">
+          <div class="payment-info">
+            <p><strong>Payment Terms:</strong> Due on receipt</p>
+            <p><strong>Thank you for your business!</strong></p>
+          </div>
+          <div class="signature-box">
+            <p>_________________________</p>
+            <p>Authorized Signature</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `;
+    
+    // Write content to the new window
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    
+    // Wait for content to load, then print
+    printWindow.onload = () => {
+      console.log('Print window loaded, triggering print...');
+      printWindow.print();
+      printWindow.close();
+    };
+  };
+
+  // Check if any filters are active
+  const hasActiveFilters = Object.values(filters).some(value => value !== '');
+  
+  // Get logged-in user info for display
+  const getLoggedInUserInfo = () => {
+    const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+    return {
+      id: userData.id || userData.staff_id || userData.employee_id,
+      name: userData.name || userData.staff_name || userData.employee_name || 'Unknown User'
+    };
+  };
+
+  // Filter employees based on search term
+  const filteredEmployees = employees.filter(employee =>
+    employee.name && employee.name.toLowerCase().includes(employeeSearchTerm.toLowerCase())
+  );
+
+  // Handle employee selection
+  const handleEmployeeSelect = (employee: any) => {
+    if (selectedSale) {
+      setSelectedSale({...selectedSale, employee_id: employee.id, employee_name: employee.name});
+    }
+    setShowEmployeeDropdown(false);
+    setEmployeeSearchTerm('');
+  };
+
   const handleFilterChange = (field: string, value: string) => {
-    setFilters(prev => ({ ...prev, [field]: value }));
+    const newFilters = { ...filters, [field]: value };
+    setFilters(newFilters);
+    
+    // Clear existing timer
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+    
+    // Set new timer for auto-filtering
+    const timer = setTimeout(() => {
+      fetchSalesWithFilters(newFilters);
+    }, 500); // 500ms delay for typing
+    
+    setDebounceTimer(timer);
+  };
+
+  const fetchSalesWithFilters = async (currentFilters = filters) => {
+    try {
+      setLoading(true);
+      
+      // Get logged-in user data from localStorage
+      const userData = JSON.parse(localStorage.getItem('user_data') || '{}');
+      const loggedInUserId = userData.id || userData.staff_id || userData.employee_id;
+      
+      const filterParams: any = {};
+      if (currentFilters.sale_status_id) filterParams.sale_status_id = parseInt(currentFilters.sale_status_id);
+      if (currentFilters.date_from) filterParams.date_from = currentFilters.date_from;
+      if (currentFilters.date_to) filterParams.date_to = currentFilters.date_to;
+      if (currentFilters.item_code) filterParams.item_code = currentFilters.item_code;
+      if (currentFilters.invoice_number) filterParams.invoice_number = currentFilters.invoice_number;
+      if (loggedInUserId) filterParams.cashier_id = loggedInUserId;
+      
+      console.log('Applying filters:', filterParams);
+      console.log('Logged-in user ID:', loggedInUserId);
+      
+      const response = await saleAnalyticsAPI.getRecords(filterParams);
+      const result = response.data;
+      if (result.success) {
+        const allSales = result.data.data || [];
+        
+        // Additional client-side filtering if needed (as backup)
+        const filteredSales = loggedInUserId 
+          ? allSales.filter((sale: Sale) => sale.cashier_id === loggedInUserId)
+          : allSales;
+          
+        setSales(filteredSales);
+        console.log(`Filtered ${filteredSales.length} records for cashier_id: ${loggedInUserId}`);
+      }
+    } catch (error) {
+      console.error('Error fetching filtered sales:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleClearFilters = () => {
@@ -259,6 +669,10 @@ const Sales: React.FC = () => {
       item_code: '',
       invoice_number: '',
     });
+    // Fetch all data after clearing filters
+    setTimeout(() => {
+      fetchSales();
+    }, 100);
   };
 
   const handleRowSelect = (id: number) => {
@@ -336,6 +750,24 @@ const Sales: React.FC = () => {
       </div>
 
       <div className="sales-filters">
+        <div className="filter-header">
+          <h3>စစ်ထုတ်ရန် (Filters)</h3>
+          <div className="filter-indicators">
+            {(() => {
+              const userInfo = getLoggedInUserInfo();
+              return userInfo.id ? (
+                <span className="cashier-indicator">
+                  👤 {userInfo.name} (ID: {userInfo.id})
+                </span>
+              ) : null;
+            })()}
+            {hasActiveFilters && (
+              <span className="filter-indicator">
+                🔍 Filters Active ({Object.values(filters).filter(v => v !== '').length})
+              </span>
+            )}
+          </div>
+        </div>
         <div className="filter-row">
           <select
             value={filters.sale_status_id}
@@ -386,7 +818,19 @@ const Sales: React.FC = () => {
 
       <div className="sales-table-container">
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-          <h3>စာရင်းများ (Records)</h3>
+          <div>
+            <h3>စာရင်းများ (Records)</h3>
+            <div style={{ margin: '5px 0 0 0', color: 'var(--text-secondary)', fontSize: '0.9rem' }}>
+              {(() => {
+                const userInfo = getLoggedInUserInfo();
+                return userInfo.id ? (
+                  <span>Showing {sales.length} records for {userInfo.name}</span>
+                ) : (
+                  <span>{hasActiveFilters ? `Showing ${sales.length} filtered records` : `Showing ${sales.length} records`}</span>
+                );
+              })()}
+            </div>
+          </div>
           <button onClick={exportToExcel} className="btn-primary" style={{ padding: '10px 20px' }}>
             📊 Export to Excel
           </button>
@@ -527,7 +971,8 @@ const Sales: React.FC = () => {
                       <td style={{ padding: '8px', border: '1px solid #ddd' }}>{sale.remark || '-'}</td>
                       <td style={{ padding: '8px', border: '1px solid #ddd' }}>{sale.sale_status_name || '-'}</td>
                       <td style={{ padding: '8px', border: '1px solid #ddd' }}>
-                        <button className="btn-icon" onClick={() => handleEdit(sale.id)} title="Edit">✏️</button>
+                        <button className="btn-icon" onClick={(e) => { e.stopPropagation(); handleEdit(sale.id); }} title="Edit">✏️</button>
+                        <button className="btn-icon" onClick={(e) => { e.stopPropagation(); console.log('Print button clicked'); handlePrint(sale); }} title="Print">🖨️</button>
                       </td>
                     </tr>
                   ))
@@ -732,18 +1177,39 @@ const Sales: React.FC = () => {
                         </div>
                         <div className="form-group">
                           <label>Sale Name (Employee):</label>
-                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
-                            const employeeId = parseInt(e.target.value);
-                            const employee = employees.find(emp => emp.id === employeeId);
-                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
-                          }}>
-                            <option value="">Select Employee</option>
-                            {employees.map((employee) => (
-                              <option key={employee.id} value={employee.id}>
-                                {employee.name}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="searchable-dropdown">
+                            <input
+                              type="text"
+                              placeholder="Search employee..."
+                              value={employeeSearchTerm || selectedSale.employee_name || ''}
+                              onChange={(e) => {
+                                setEmployeeSearchTerm(e.target.value);
+                                setShowEmployeeDropdown(true);
+                              }}
+                              onFocus={() => setShowEmployeeDropdown(true)}
+                              onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                              className="employee-search-input"
+                            />
+                            {showEmployeeDropdown && (
+                              <div className="employee-dropdown-list">
+                                {filteredEmployees.length > 0 ? (
+                                  filteredEmployees.map((employee) => (
+                                    <div
+                                      key={employee.id}
+                                      className="employee-option"
+                                      onMouseDown={() => handleEmployeeSelect(employee)}
+                                    >
+                                      {employee.name}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="employee-option no-results">
+                                    No employees found
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </>
                     )}
@@ -872,18 +1338,39 @@ const Sales: React.FC = () => {
                         </div>
                         <div className="form-group">
                           <label>Sale Name (Employee):</label>
-                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
-                            const employeeId = parseInt(e.target.value);
-                            const employee = employees.find(emp => emp.id === employeeId);
-                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
-                          }}>
-                            <option value="">Select Employee</option>
-                            {employees.map((employee) => (
-                              <option key={employee.id} value={employee.id}>
-                                {employee.name}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="searchable-dropdown">
+                            <input
+                              type="text"
+                              placeholder="Search employee..."
+                              value={employeeSearchTerm || selectedSale.employee_name || ''}
+                              onChange={(e) => {
+                                setEmployeeSearchTerm(e.target.value);
+                                setShowEmployeeDropdown(true);
+                              }}
+                              onFocus={() => setShowEmployeeDropdown(true)}
+                              onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                              className="employee-search-input"
+                            />
+                            {showEmployeeDropdown && (
+                              <div className="employee-dropdown-list">
+                                {filteredEmployees.length > 0 ? (
+                                  filteredEmployees.map((employee) => (
+                                    <div
+                                      key={employee.id}
+                                      className="employee-option"
+                                      onMouseDown={() => handleEmployeeSelect(employee)}
+                                    >
+                                      {employee.name}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="employee-option no-results">
+                                    No employees found
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="form-group full-width">
                           <label>မှတ်ချက် (Remark):</label>
@@ -1048,18 +1535,39 @@ const Sales: React.FC = () => {
                         </div>
                         <div className="form-group">
                           <label>Sale Name (Employee):</label>
-                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
-                            const employeeId = parseInt(e.target.value);
-                            const employee = employees.find(emp => emp.id === employeeId);
-                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
-                          }}>
-                            <option value="">Select Employee</option>
-                            {employees.map((employee) => (
-                              <option key={employee.id} value={employee.id}>
-                                {employee.name}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="searchable-dropdown">
+                            <input
+                              type="text"
+                              placeholder="Search employee..."
+                              value={employeeSearchTerm || selectedSale.employee_name || ''}
+                              onChange={(e) => {
+                                setEmployeeSearchTerm(e.target.value);
+                                setShowEmployeeDropdown(true);
+                              }}
+                              onFocus={() => setShowEmployeeDropdown(true)}
+                              onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                              className="employee-search-input"
+                            />
+                            {showEmployeeDropdown && (
+                              <div className="employee-dropdown-list">
+                                {filteredEmployees.length > 0 ? (
+                                  filteredEmployees.map((employee) => (
+                                    <div
+                                      key={employee.id}
+                                      className="employee-option"
+                                      onMouseDown={() => handleEmployeeSelect(employee)}
+                                    >
+                                      {employee.name}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="employee-option no-results">
+                                    No employees found
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="form-group">
                           <label>On/Off:</label>
@@ -1284,18 +1792,39 @@ const Sales: React.FC = () => {
                         </div>
                         <div className="form-group">
                           <label>Sale Name (Employee):</label>
-                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
-                            const employeeId = parseInt(e.target.value);
-                            const employee = employees.find(emp => emp.id === employeeId);
-                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
-                          }}>
-                            <option value="">Select Employee</option>
-                            {employees.map((employee) => (
-                              <option key={employee.id} value={employee.id}>
-                                {employee.name}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="searchable-dropdown">
+                            <input
+                              type="text"
+                              placeholder="Search employee..."
+                              value={employeeSearchTerm || selectedSale.employee_name || ''}
+                              onChange={(e) => {
+                                setEmployeeSearchTerm(e.target.value);
+                                setShowEmployeeDropdown(true);
+                              }}
+                              onFocus={() => setShowEmployeeDropdown(true)}
+                              onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                              className="employee-search-input"
+                            />
+                            {showEmployeeDropdown && (
+                              <div className="employee-dropdown-list">
+                                {filteredEmployees.length > 0 ? (
+                                  filteredEmployees.map((employee) => (
+                                    <div
+                                      key={employee.id}
+                                      className="employee-option"
+                                      onMouseDown={() => handleEmployeeSelect(employee)}
+                                    >
+                                      {employee.name}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="employee-option no-results">
+                                    No employees found
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </>
                     )}
@@ -1420,18 +1949,39 @@ const Sales: React.FC = () => {
                         </div>
                         <div className="form-group">
                           <label>Sale Name (Employee):</label>
-                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
-                            const employeeId = parseInt(e.target.value);
-                            const employee = employees.find(emp => emp.id === employeeId);
-                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
-                          }}>
-                            <option value="">Select Employee</option>
-                            {employees.map((employee) => (
-                              <option key={employee.id} value={employee.id}>
-                                {employee.name}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="searchable-dropdown">
+                            <input
+                              type="text"
+                              placeholder="Search employee..."
+                              value={employeeSearchTerm || selectedSale.employee_name || ''}
+                              onChange={(e) => {
+                                setEmployeeSearchTerm(e.target.value);
+                                setShowEmployeeDropdown(true);
+                              }}
+                              onFocus={() => setShowEmployeeDropdown(true)}
+                              onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                              className="employee-search-input"
+                            />
+                            {showEmployeeDropdown && (
+                              <div className="employee-dropdown-list">
+                                {filteredEmployees.length > 0 ? (
+                                  filteredEmployees.map((employee) => (
+                                    <div
+                                      key={employee.id}
+                                      className="employee-option"
+                                      onMouseDown={() => handleEmployeeSelect(employee)}
+                                    >
+                                      {employee.name}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="employee-option no-results">
+                                    No employees found
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                       </>
                     )}
@@ -1584,18 +2134,39 @@ const Sales: React.FC = () => {
                         </div>
                         <div className="form-group">
                           <label>Sale Name (Employee):</label>
-                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
-                            const employeeId = parseInt(e.target.value);
-                            const employee = employees.find(emp => emp.id === employeeId);
-                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
-                          }}>
-                            <option value="">Select Employee</option>
-                            {employees.map((employee) => (
-                              <option key={employee.id} value={employee.id}>
-                                {employee.name}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="searchable-dropdown">
+                            <input
+                              type="text"
+                              placeholder="Search employee..."
+                              value={employeeSearchTerm || selectedSale.employee_name || ''}
+                              onChange={(e) => {
+                                setEmployeeSearchTerm(e.target.value);
+                                setShowEmployeeDropdown(true);
+                              }}
+                              onFocus={() => setShowEmployeeDropdown(true)}
+                              onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                              className="employee-search-input"
+                            />
+                            {showEmployeeDropdown && (
+                              <div className="employee-dropdown-list">
+                                {filteredEmployees.length > 0 ? (
+                                  filteredEmployees.map((employee) => (
+                                    <div
+                                      key={employee.id}
+                                      className="employee-option"
+                                      onMouseDown={() => handleEmployeeSelect(employee)}
+                                    >
+                                      {employee.name}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="employee-option no-results">
+                                    No employees found
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="form-group">
                           <label>On/Off:</label>
@@ -1764,18 +2335,39 @@ const Sales: React.FC = () => {
                         </div>
                         <div className="form-group">
                           <label>Sale Name (Employee):</label>
-                          <select value={selectedSale.employee_id || ''} onChange={(e) => {
-                            const employeeId = parseInt(e.target.value);
-                            const employee = employees.find(emp => emp.id === employeeId);
-                            setSelectedSale({...selectedSale, employee_id: employeeId, employee_name: employee?.name || ''});
-                          }}>
-                            <option value="">Select Employee</option>
-                            {employees.map((employee) => (
-                              <option key={employee.id} value={employee.id}>
-                                {employee.name}
-                              </option>
-                            ))}
-                          </select>
+                          <div className="searchable-dropdown">
+                            <input
+                              type="text"
+                              placeholder="Search employee..."
+                              value={employeeSearchTerm || selectedSale.employee_name || ''}
+                              onChange={(e) => {
+                                setEmployeeSearchTerm(e.target.value);
+                                setShowEmployeeDropdown(true);
+                              }}
+                              onFocus={() => setShowEmployeeDropdown(true)}
+                              onBlur={() => setTimeout(() => setShowEmployeeDropdown(false), 200)}
+                              className="employee-search-input"
+                            />
+                            {showEmployeeDropdown && (
+                              <div className="employee-dropdown-list">
+                                {filteredEmployees.length > 0 ? (
+                                  filteredEmployees.map((employee) => (
+                                    <div
+                                      key={employee.id}
+                                      className="employee-option"
+                                      onMouseDown={() => handleEmployeeSelect(employee)}
+                                    >
+                                      {employee.name}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <div className="employee-option no-results">
+                                    No employees found
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </div>
                         </div>
                         <div className="form-group">
                           <label>On/Off:</label>
